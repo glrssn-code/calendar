@@ -428,7 +428,7 @@ export default function SettingsPage() {
                     }
                   }}
                 >
-                  版本 1.0.1
+                  版本 1.0.2
                 </p>
                 <p
                   className="text-sm text-slate-500 mt-1 cursor-pointer hover:text-blue-500 transition-colors"

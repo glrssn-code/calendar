@@ -362,6 +362,7 @@ export function WeeklyCalendar({
             <div className="flex flex-1 min-w-0">
               {weekDays.map((day) => {
                 const dateKey = format(day, 'yyyy-MM-dd');
+                const dayIsToday = format(day, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
                 const allEvents = getEventsByDate(dateKey);
                 // 如果有过滤条件，只显示匹配的事件
                 const events = filteredEventIds
@@ -375,8 +376,9 @@ export function WeeklyCalendar({
                     onSlotClick={handleSlotClick}
                     onEventClick={handleEventClick}
                     onEventUpdate={handleEventUpdate}
-                    isToday={format(day, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')}
+                    isToday={dayIsToday}
                     showHeader={false}
+                    compactMode={!dayIsToday}
                     draggingEvent={draggingEvent}
                     dragPreview={dragPreview}
                     isDragging={isDragging}

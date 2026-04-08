@@ -95,6 +95,7 @@ interface DayColumnProps {
   onEventUpdate?: (event: CalendarEvent) => void;
   isToday: boolean;
   showHeader?: boolean;
+  compactMode?: boolean; // 紧凑模式：只显示待办，不显示时间轴
   // 拖动相关（由父组件管理）
   draggingEvent?: CalendarEvent | null;
   dragPreview?: { date: Date; top: number } | null;
@@ -111,6 +112,7 @@ export function DayColumn({
   onEventUpdate,
   isToday,
   showHeader = true,
+  compactMode = false,
   draggingEvent: externalDraggingEvent,
   dragPreview: externalDragPreview,
   isDragging: externalIsDragging,
@@ -193,136 +195,193 @@ export function DayColumn({
 
       <div
         ref={containerRef}
-        className="relative"
+        className="relative overflow-y-auto"
         style={{ height: '700px' }}
       >
-        {/* 时间格子 */}
-        {TIME_SLOTS.map((slot, index) => {
-          const top = index * HOUR_HEIGHT;
-          return (
-            <TimeSlot
-              key={index}
-              hour={slot.hour}
-              top={top}
-              height={HOUR_HEIGHT}
-              onSlotClick={handleSlotClick}
-              onHover={handleHover}
-              isDragging={isDraggingFromExternal}
-            />
-          );
-        })}
-
-        {/* 事件层 */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{ height: '700px' }}
-        >
-          {(() => {
-            const timedEvents = events.filter(e => !e.isAllDay && e.startTime && e.endTime);
-            const layout = calculateEventLayout(timedEvents);
-            const MIN_HEIGHT = HOUR_HEIGHT / 2;
-
-            return timedEvents.map((event) => {
-              const [startH, startM] = event.startTime!.split(':').map(Number);
-              const [endH, endM] = event.endTime!.split(':').map(Number);
-              const startMinutes = (startH - 8) * 60 + startM;
-              const endMinutes = (endH - 8) * 60 + endM;
-              const top = (startMinutes / (15 * 60)) * 700;
-              const calculatedHeight = ((endMinutes - startMinutes) / (15 * 60)) * 700;
-              const height = Math.max(calculatedHeight, MIN_HEIGHT);
-
-              const { col, cols } = layout.get(event.id) || { col: 0, cols: 1 };
-              const gap = 2;
-              const totalGaps = (cols - 1) * gap;
-              const availWidth = 100 - totalGaps;
-              const width = availWidth / cols;
-              const left = col * (width + gap);
-
-              // 检查是否是正在拖动的事件
-              const isDragging = draggingEventId === event.id;
-
+        {/* 紧凑模式：只显示待办列表 */}
+        {compactMode ? (
+          <div className="p-1">
+            {events.filter(e => e.isAllDay).length === 0 ? (
+              <div className="text-center text-[10px] text-slate-400 py-4">
+                暂无待办
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {events.filter(e => e.isAllDay).map((event) => (
+                  <div
+                    key={event.id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('event', JSON.stringify(event));
+                      e.dataTransfer.setData('source', 'todo');
+                    }}
+                    className={`px-1.5 py-1 rounded text-[10px] cursor-pointer transition-all ${
+                      event.completed
+                        ? 'bg-slate-100 opacity-60 line-through text-slate-400'
+                        : event.isUrgent
+                        ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                    }`}
+                    onClick={() => onEventClick(event)}
+                  >
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onEventUpdate) {
+                            onEventUpdate({ ...event, completed: !event.completed });
+                          }
+                        }}
+                        className={`w-3 h-3 rounded border flex-shrink-0 flex items-center justify-center ${
+                          event.completed
+                            ? 'bg-green-500 border-green-500 text-white'
+                            : 'border-slate-300 hover:border-green-400'
+                        }`}
+                      >
+                        {event.completed && (
+                          <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                      <span className="truncate">{event.title}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* 时间格子 */}
+            {TIME_SLOTS.map((slot, index) => {
+              const top = index * HOUR_HEIGHT;
               return (
+                <TimeSlot
+                  key={index}
+                  hour={slot.hour}
+                  top={top}
+                  height={HOUR_HEIGHT}
+                  onSlotClick={handleSlotClick}
+                  onHover={handleHover}
+                  isDragging={isDraggingFromExternal}
+                />
+              );
+            })}
+
+            {/* 事件层 */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{ height: '700px' }}
+            >
+              {(() => {
+                const timedEvents = events.filter(e => !e.isAllDay && e.startTime && e.endTime);
+                const layout = calculateEventLayout(timedEvents);
+                const MIN_HEIGHT = HOUR_HEIGHT / 2;
+
+                return timedEvents.map((event) => {
+                  const [startH, startM] = event.startTime!.split(':').map(Number);
+                  const [endH, endM] = event.endTime!.split(':').map(Number);
+                  const startMinutes = (startH - 8) * 60 + startM;
+                  const endMinutes = (endH - 8) * 60 + endM;
+                  const top = (startMinutes / (15 * 60)) * 700;
+                  const calculatedHeight = ((endMinutes - startMinutes) / (15 * 60)) * 700;
+                  const height = Math.max(calculatedHeight, MIN_HEIGHT);
+
+                  const { col, cols } = layout.get(event.id) || { col: 0, cols: 1 };
+                  const gap = 2;
+                  const totalGaps = (cols - 1) * gap;
+                  const availWidth = 100 - totalGaps;
+                  const width = availWidth / cols;
+                  const left = col * (width + gap);
+
+                  // 检查是否是正在拖动的事件
+                  const isDragging = draggingEventId === event.id;
+
+                  return (
+                    <div
+                      key={event.id}
+                      className="absolute pointer-events-auto"
+                      style={{
+                        top: `${top}px`,
+                        height: `${height}px`,
+                        left: `${left}%`,
+                        width: `${width}%`,
+                        zIndex: isDragging ? 20 : 10,
+                        opacity: isDragging ? 0.5 : 1,
+                      }}
+                    >
+                      <EventBlock
+                        event={event}
+                        onClick={() => {
+                          if (dragMovedRef?.current) {
+                            return;
+                          }
+                          onEventClick(event);
+                        }}
+                        height={height}
+                        onDragStart={handleEventDragStart}
+                        onDragEnd={() => {}} // 由父组件处理
+                        onToggleComplete={onEventUpdate ? (e) => {
+                          const updated = { ...e, completed: !e.completed };
+                          onEventUpdate(updated);
+                        } : undefined}
+                      />
+                    </div>
+                  );
+                });
+              })()}
+
+              {/* 跨天拖动预览 - 显示在目标列 */}
+              {externalDraggingEvent && externalDragPreview && isThisColumnBeingDraggedTo && externalDraggingEvent.startTime && externalDraggingEvent.endTime && (
                 <div
-                  key={event.id}
-                  className="absolute pointer-events-auto"
+                  className="absolute pointer-events-none"
                   style={{
-                    top: `${top}px`,
-                    height: `${height}px`,
-                    left: `${left}%`,
-                    width: `${width}%`,
-                    zIndex: isDragging ? 20 : 10,
-                    opacity: isDragging ? 0.5 : 1,
+                    top: `${externalDragPreview.top}px`,
+                    height: `${((parseInt(externalDraggingEvent.endTime.split(':')[0]) * 60 + parseInt(externalDraggingEvent.endTime.split(':')[1])) - (parseInt(externalDraggingEvent.startTime.split(':')[0]) * 60 + parseInt(externalDraggingEvent.startTime.split(':')[1]))) / 60 * HOUR_HEIGHT}px`,
+                    left: '4%',
+                    width: '92%',
+                    zIndex: 25,
                   }}
                 >
-                  <EventBlock
-                    event={event}
-                    onClick={() => {
-                      if (dragMovedRef?.current) {
-                        return;
-                      }
-                      onEventClick(event);
-                    }}
-                    height={height}
-                    onDragStart={handleEventDragStart}
-                    onDragEnd={() => {}} // 由父组件处理
-                    onToggleComplete={onEventUpdate ? (e) => {
-                      const updated = { ...e, completed: !e.completed };
-                      onEventUpdate(updated);
-                    } : undefined}
-                  />
+                  <div className="w-full h-full border-2 border-dashed border-blue-400 rounded-lg bg-blue-50/50 backdrop-blur-sm flex items-center justify-center">
+                    <span className="text-xs text-blue-500 font-medium">{externalDraggingEvent.title}</span>
+                  </div>
                 </div>
-              );
-            });
-          })()}
-
-          {/* 跨天拖动预览 - 显示在目标列 */}
-          {externalDraggingEvent && externalDragPreview && isThisColumnBeingDraggedTo && externalDraggingEvent.startTime && externalDraggingEvent.endTime && (
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                top: `${externalDragPreview.top}px`,
-                height: `${((parseInt(externalDraggingEvent.endTime.split(':')[0]) * 60 + parseInt(externalDraggingEvent.endTime.split(':')[1])) - (parseInt(externalDraggingEvent.startTime.split(':')[0]) * 60 + parseInt(externalDraggingEvent.startTime.split(':')[1]))) / 60 * HOUR_HEIGHT}px`,
-                left: '4%',
-                width: '92%',
-                zIndex: 25,
-              }}
-            >
-              <div className="w-full h-full border-2 border-dashed border-blue-400 rounded-lg bg-blue-50/50 backdrop-blur-sm flex items-center justify-center">
-                <span className="text-xs text-blue-500 font-medium">{externalDraggingEvent.title}</span>
-              </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* 加号悬浮层 */}
-        {hoveredSlot && !slotHasEvent(hoveredSlot.hour) && (
-          <div
-            className="absolute left-0 right-0 pointer-events-none"
-            style={{
-              top: `${hoveredSlot.top}px`,
-              height: `${HOUR_HEIGHT}px`,
-              zIndex: 15,
-            }}
-          >
-            <div
-              className="absolute inset-0 flex items-center justify-center"
-              onClick={() => handleSlotClick(hoveredSlot.hour)}
-            >
+            {/* 加号悬浮层 */}
+            {hoveredSlot && !slotHasEvent(hoveredSlot.hour) && (
               <div
-                className="w-9 h-9 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: 'rgba(0, 122, 255, 0.9)' }}
+                className="absolute left-0 right-0 pointer-events-none"
+                style={{
+                  top: `${hoveredSlot.top}px`,
+                  height: `${HOUR_HEIGHT}px`,
+                  zIndex: 15,
+                }}
               >
-                <Plus className="w-5 h-5 text-white" />
+                <div
+                  className="absolute inset-0 flex items-center justify-center"
+                  onClick={() => handleSlotClick(hoveredSlot.hour)}
+                >
+                  <div
+                    className="w-9 h-9 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: 'rgba(0, 122, 255, 0.9)' }}
+                  >
+                    <Plus className="w-5 h-5 text-white" />
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {isToday && currentTimePosition >= 0 && (
-          <div
-            className="absolute left-0 right-0 h-0.5 current-time-line z-20 pointer-events-none"
-            style={{ top: `${currentTimePosition}px` }}
-          />
+            {isToday && currentTimePosition >= 0 && (
+              <div
+                className="absolute left-0 right-0 h-0.5 current-time-line z-20 pointer-events-none"
+                style={{ top: `${currentTimePosition}px` }}
+              />
+            )}
+          </>
         )}
       </div>
     </div>

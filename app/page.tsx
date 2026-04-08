@@ -17,7 +17,7 @@ import { useSettings } from '@/hooks/useSettings';
 type ViewType = 'day' | 'week' | 'month';
 
 function HomeContent() {
-  const { state } = useEvents();
+  const { state, updateEvent } = useEvents();
   const { settings, isLoaded } = useSettings();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
@@ -350,6 +350,7 @@ function HomeContent() {
             onDateChange={setCurrentDate}
             onEventClick={handleEditEvent}
             onSlotClick={(hour) => handleCreateEvent(currentDate, hour)}
+            onEventUpdate={updateEvent}
             filteredEventIds={filteredEventIds}
           />
         )}
