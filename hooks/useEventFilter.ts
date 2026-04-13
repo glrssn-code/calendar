@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { CalendarEvent } from '@/types/event';
+import { StickyNote } from '@/types/stickyNote';
 import { CATEGORIES } from '@/types/event';
 
 export type FilterCategory = '全部' | '售前' | '项目' | '会议' | '管理' | '推广' | '其它';
@@ -24,7 +25,7 @@ const initialFilterOptions: FilterOptions = {
   showUrgentOnly: false,
 };
 
-export function useEventFilter(events: CalendarEvent[]) {
+export function useEventFilter(events: CalendarEvent[], stickyNotes?: StickyNote[]) {
   const [filters, setFilters] = useState<FilterOptions>(initialFilterOptions);
 
   // 更新单个过滤条件
@@ -127,6 +128,19 @@ export function useEventFilter(events: CalendarEvent[]) {
     });
   }, [events, filters]);
 
+  // 过滤后的便签
+  const filteredStickyNotes = useMemo(() => {
+    if (!stickyNotes) return [];
+    if (!filters.searchQuery) return stickyNotes;
+
+    const query = filters.searchQuery.toLowerCase();
+    return stickyNotes.filter(note => {
+      const titleMatch = note.title.toLowerCase().includes(query);
+      const contentMatch = note.content?.toLowerCase().includes(query);
+      return titleMatch || contentMatch;
+    });
+  }, [stickyNotes, filters.searchQuery]);
+
   // 统计信息
   const stats = useMemo(() => ({
     total: events.length,
@@ -138,6 +152,7 @@ export function useEventFilter(events: CalendarEvent[]) {
   return {
     filters,
     filteredEvents,
+    filteredStickyNotes,
     stats,
     hasActiveFilters,
     setSearchQuery,

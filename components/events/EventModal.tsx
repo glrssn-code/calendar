@@ -7,7 +7,10 @@ import { CalendarEvent, NewEvent } from '@/types/event';
 import { EventForm } from './EventForm';
 import { useEventReminders } from '@/hooks/useEventReminders';
 import { useEvents } from '@/context/EventContext';
+import { useUndo } from '@/context/UndoContext';
+import { eventDB } from '@/lib/db';
 import { toast } from 'sonner';
+import { useNoteEventSync } from '@/hooks/useNoteEventSync';
 
 interface EventModalProps {
   isOpen: boolean;
@@ -28,8 +31,10 @@ export function EventModal({
   defaultUseSmartInput = false,
   defaultDuration = 30,
 }: EventModalProps) {
-  const { addEvent, updateEvent, deleteEvent } = useEvents();
+  const { addEvent, updateEvent, deleteEvent, state, dispatch } = useEvents();
+  const { pushAction } = useUndo();
   const { requestPermission } = useEventReminders();
+  const { syncEventCompletionToNote, syncEventColorToNote, syncEventTitleToNote } = useNoteEventSync();
 
   useEffect(() => {
     if (isOpen && initialEvent?.reminderEnabled) {
@@ -39,6 +44,13 @@ export function EventModal({
 
   const handleSubmit = async (eventData: NewEvent | CalendarEvent) => {
     if (initialEvent) {
+      // 同步事件更新到便签
+      if (initialEvent.sourceNoteId) {
+        const oldEvent = state.events.find(e => e.id === initialEvent.id);
+        syncEventCompletionToNote(eventData as CalendarEvent);
+        syncEventColorToNote(eventData as CalendarEvent);
+        syncEventTitleToNote(eventData as CalendarEvent);
+      }
       updateEvent(eventData as CalendarEvent);
       toast.success('事件已更新');
     } else {
@@ -59,8 +71,21 @@ export function EventModal({
 
   const handleDelete = () => {
     if (initialEvent) {
+      // 注册撤销操作
+      pushAction({
+        type: 'DELETE_EVENT',
+        description: `删除事件: ${initialEvent.title}`,
+        previousData: initialEvent,
+        undo: async () => {
+          await eventDB.add(initialEvent);
+          dispatch({ type: 'ADD_EVENT', payload: initialEvent });
+          toast.success(`已恢复事件: ${initialEvent.title}`);
+        },
+      });
+
+      // 删除事件
       deleteEvent(initialEvent.id);
-      toast.success('事件已删除');
+      toast.success('事件已删除，按 Ctrl+Z 撤销');
       onClose();
     }
   };

@@ -1,16 +1,16 @@
-export type EventColor = 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'purple';
+// Re-export all constants and types from lib/constants for backwards compatibility
+export {
+  CATEGORIES,
+  CATEGORY_COLORS,
+  COLOR_CATEGORY_ORDER,
+  COLOR_CATEGORY_MAP,
+  CATEGORY_OPTIONS,
+  COLOR_OPTIONS,
+} from '@/lib/constants';
 
-// 事件类别映射到颜色
-export const CATEGORY_COLORS: Record<string, EventColor> = {
-  '售前': 'orange',
-  '项目': 'yellow',
-  '会议': 'blue',
-  '管理': 'indigo',
-  '推广': 'purple',
-  '其它': 'green',
-};
-
-export const CATEGORIES = ['售前', '项目', '会议', '管理', '推广', '其它'];
+// Import EventColor for use in this file (re-export alone doesn't make it usable locally)
+import type { EventColor } from '@/lib/constants';
+export type { EventColor };
 
 export interface CalendarEvent {
   id: string;
@@ -27,6 +27,7 @@ export interface CalendarEvent {
   completed: boolean; // 是否已完成
   isAllDay?: boolean; // 是否为全天待办（无时间）
   createdAt: string;
+  sourceNoteId?: string; // 来源便签ID，用于同步
 }
 
 export type NewEvent = Omit<CalendarEvent, 'id' | 'createdAt'>;

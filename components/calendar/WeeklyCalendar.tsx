@@ -5,9 +5,13 @@ import { addWeeks, subWeeks, startOfWeek, addDays, format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { DayColumn } from './DayColumn';
 import { useEvents } from '@/context/EventContext';
-import { CalendarEvent } from '@/types/event';
+import { useStickyNotes } from '@/context/StickyNoteContext';
+import { CalendarEvent, CATEGORY_COLORS } from '@/types/event';
+import { StickyNote } from '@/types/stickyNote';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useSettings } from '@/hooks/useSettings';
+import { useNoteEventSync } from '@/hooks/useNoteEventSync';
 
 interface WeeklyCalendarProps {
   onCreateEvent: (date: Date, hour: number) => void;
@@ -26,7 +30,10 @@ export function WeeklyCalendar({
   filteredEventIds,
   weekStartsOn = 0,
 }: WeeklyCalendarProps) {
-  const { getEventsByDate, updateEvent } = useEvents();
+  const { getEventsByDate, updateEvent, addEvent, state } = useEvents();
+  const { addLinkedEvent } = useStickyNotes();
+  const { settings } = useSettings();
+  const { syncEventCompletionToNote, syncEventColorToNote, syncEventTitleToNote } = useNoteEventSync();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 拖动状态（提升到 WeeklyCalendar 层面以支持跨天拖动）
@@ -39,13 +46,20 @@ export function WeeklyCalendar({
   const dragStartDateRef = useRef<Date | null>(null);
   const dragMovedRef = useRef(false);
 
+  // 便签拖拽状态
+  const [stickyNoteDragHint, setStickyNoteDragHint] = useState<{ x: number; y: number; time: string } | null>(null);
+  const isStickyNoteDraggingRef = useRef(false);
+
   const weekStart = startOfWeek(currentDate, { weekStartsOn });
   const weekDays = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   }, [weekStart]);
 
   const today = new Date();
-  const HOUR_HEIGHT = 700 / 15;
+  // 缩放比例：让30分钟高度 = 原来的35分钟高度
+  const SCALE = 35 / 30;
+  const BASE_HOUR_HEIGHT = 700 / 15;
+  const HOUR_HEIGHT = BASE_HOUR_HEIGHT * SCALE;
   const hours = Array.from({ length: 15 }, (_, i) => i + 8);
 
   // 初始化滚动到当前时间附近
@@ -53,10 +67,22 @@ export function WeeklyCalendar({
     if (scrollRef.current) {
       const currentHour = new Date().getHours();
       if (currentHour >= 8 && currentHour <= 22) {
-        const scrollTop = ((currentHour - 8) / 14) * 700 - 100;
+        const scrollTop = ((currentHour - 8) / 14) * 15 * HOUR_HEIGHT - 100;
         scrollRef.current.scrollTop = Math.max(0, scrollTop);
       }
     }
+  }, []);
+
+  // 监听便签拖拽结束事件，重置拖拽状态
+  useEffect(() => {
+    const handleStickyNoteDragEnd = () => {
+      isStickyNoteDraggingRef.current = false;
+      setStickyNoteDragHint(null);
+    };
+    window.addEventListener('sticky-note-drag-end', handleStickyNoteDragEnd);
+    return () => {
+      window.removeEventListener('sticky-note-drag-end', handleStickyNoteDragEnd);
+    };
   }, []);
 
   // 拖动开始
@@ -243,28 +269,110 @@ export function WeeklyCalendar({
   const goToNextWeek = () => onDateChange(addWeeks(currentDate, 1));
   const goToToday = () => onDateChange(new Date());
 
-  const handleSlotClick = (date: Date, hour: number) => {
+  const handleSlotClick = useCallback((date: Date, hour: number) => {
     // 如果刚完成拖动，不触发新建
     if (dragMovedRef.current) {
       return;
     }
     onCreateEvent(date, hour);
-  };
+  }, [onCreateEvent]);
 
-  const handleEventClick = (event: CalendarEvent) => {
+  const handleEventClick = useCallback((event: CalendarEvent) => {
     onEditEvent(event);
-  };
+  }, [onEditEvent]);
 
-  const handleEventUpdate = (event: CalendarEvent) => {
+  const handleEventUpdate = useCallback((event: CalendarEvent) => {
+    // 同步到关联的便签
+    if (event.sourceNoteId) {
+      syncEventCompletionToNote(event);
+      syncEventColorToNote(event);
+      syncEventTitleToNote(event);
+    }
     updateEvent(event);
-  };
+  }, [syncEventCompletionToNote, syncEventColorToNote, syncEventTitleToNote, updateEvent]);
+
+  // 处理便签拖放到日历
+  const handleStickyNoteDrop = useCallback((note: StickyNote, date: Date, hour: number, minute?: number) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const min = minute || 0;
+    const startTime = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
+
+    // 使用默认事件时长，最小30分钟
+    const duration = Math.max(30, parseInt(settings.defaultEventDuration));
+    const startTotalMinutes = hour * 60 + min;
+    const endMinutes = startTotalMinutes + duration;
+    const endHour = Math.min(Math.floor(endMinutes / 60), 22);
+    const endMinute = endMinutes % 60;
+    const endTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
+
+    // 根据便签颜色获取对应的类别
+    const colorToCategory: Record<string, string> = {
+      orange: '售前',
+      yellow: '项目',
+      green: '其它',
+      blue: '会议',
+      indigo: '管理',
+      purple: '推广',
+    };
+    const category = colorToCategory[note.color] || '其它';
+
+    // 直接从 events 中查找 sourceNoteId === note.id 的事件
+    // 这样可以确保获取到最新的状态，不依赖 note.linkedEventIds
+    const existingEvent = state.events.find(e => e.sourceNoteId === note.id);
+
+    if (existingEvent) {
+      // 如果已有链接的事件，更新其位置（不改变其他属性）
+      updateEvent({
+        ...existingEvent,
+        date: dateStr,
+        startTime,
+        endTime,
+      });
+    } else {
+      // 如果没有链接的事件，创建新事件并链接到便签
+      const newEvent = addEvent({
+        title: note.title,
+        description: note.content,
+        date: dateStr,
+        startTime,
+        endTime,
+        reminderEnabled: false,
+        reminderMinutes: 0,
+        isUrgent: note.isUrgent,
+        category,
+        color: note.color,
+        completed: note.completed, // 使用便签的完成状态
+        isAllDay: false,
+        sourceNoteId: note.id, // 链接到便签
+      });
+
+      // 将事件ID添加到便签的关联列表
+      if (newEvent?.id) {
+        addLinkedEvent(note.id, newEvent.id);
+      }
+    }
+
+    // 重置便签拖拽状态
+    isStickyNoteDraggingRef.current = false;
+    setStickyNoteDragHint(null);
+    window.dispatchEvent(new CustomEvent('sticky-note-drag-end'));
+  }, [addEvent, addLinkedEvent, settings.defaultEventDuration, state.events, updateEvent]);
+
+  // 处理便签拖拽到日历上时显示提示
+  const handleStickyNoteDragOver = useCallback((date: Date, hour: number, minute?: number) => {
+    isStickyNoteDraggingRef.current = true;
+    const min = minute || 0;
+    const hintTime = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
+    // 使用一个假的坐标，让提示框能显示
+    setStickyNoteDragHint({ x: window.innerWidth / 2, y: 100, time: hintTime });
+  }, []);
 
   return (
     <div className="flex flex-col h-full bg-white relative">
-      {/* 拖动提示框 */}
+      {/* 事件块拖动提示框 */}
       {dragHint && (
         <div
-          className="fixed z-50 px-2 py-1 text-sm font-medium pointer-events-none"
+          className="fixed z-50 px-2 py-1 text-sm font-medium pointer-events-none bg-white/90 backdrop-blur rounded shadow-lg border border-slate-200"
           style={{
             left: dragHint.x + 12,
             top: dragHint.y - 24,
@@ -274,22 +382,67 @@ export function WeeklyCalendar({
         </div>
       )}
 
-      {/* 星期标题栏 - 拟物风格 */}
-      <div className="flex border-b border-slate-200 bg-gradient-to-b from-slate-100 to-slate-200">
-        <div className="w-14 flex-shrink-0 bg-gradient-to-b from-slate-100 to-slate-200 border-r border-slate-300" />
+      {/* 便签拖动提示框 */}
+      {stickyNoteDragHint && (
+        <div
+          className="fixed z-50 px-2 py-1 text-sm font-medium pointer-events-none bg-orange-500/90 backdrop-blur rounded shadow-lg text-white"
+          style={{
+            left: stickyNoteDragHint.x - 30,
+            top: stickyNoteDragHint.y - 24,
+          }}
+        >
+          {stickyNoteDragHint.time}
+        </div>
+      )}
+
+      {/* 星期标题栏 */}
+      <div className={`flex border-b ${
+        settings.theme === 'frostedGlass'
+          ? 'border-white/20 bg-white/15 backdrop-blur-md'
+          : settings.theme === 'cartoon'
+          ? 'border-pink-200 bg-gradient-to-b from-white to-pink-50'
+          : 'border-slate-200 bg-gradient-to-b from-slate-100 to-slate-200'
+      }`}>
+        <div className={`w-14 flex-shrink-0 border-r ${
+          settings.theme === 'frostedGlass'
+            ? 'border-white/20 bg-white/10 backdrop-blur'
+            : settings.theme === 'cartoon'
+            ? 'border-pink-200 bg-pink-50'
+            : 'border-slate-300 bg-gradient-to-b from-slate-100 to-slate-200'
+        }`} />
         {weekDays.map((day) => {
           const dateKey = format(day, 'yyyy-MM-dd');
           const isToday = format(day, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
           return (
             <div
               key={dateKey}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 ${isToday ? 'bg-gradient-to-b from-blue-100 to-blue-200' : 'bg-gradient-to-b from-white to-slate-50'} ${isToday ? '' : 'hover:bg-gradient-to-b hover:from-slate-50 hover:to-white'}`}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 ${
+                settings.theme === 'frostedGlass'
+                  ? isToday ? 'bg-white/20 backdrop-blur' : 'hover:bg-white/10'
+                  : settings.theme === 'cartoon'
+                  ? isToday ? 'bg-gradient-to-b from-pink-100 to-pink-200' : 'hover:bg-pink-50'
+                  : isToday ? 'bg-gradient-to-b from-blue-100 to-blue-200' : 'bg-gradient-to-b from-white to-slate-50 hover:bg-gradient-to-b hover:from-slate-50 hover:to-white'
+              }`}
             >
-              <span className={`text-xs font-medium ${isToday ? 'text-blue-600' : 'text-slate-500'}`}>
+              <span className={`text-xs font-medium ${
+                settings.theme === 'frostedGlass'
+                  ? isToday ? 'text-yellow-300' : 'text-white'
+                  : settings.theme === 'cartoon'
+                  ? isToday ? 'text-pink-600' : 'text-slate-500'
+                  : isToday ? 'text-blue-600' : 'text-slate-500'
+              }`}>
                 {format(day, 'EEE', { locale: zhCN }).replace('周', '')}
               </span>
               <span className={`w-7 h-7 flex items-center justify-center rounded-lg text-sm font-semibold shadow-sm ${
-                isToday
+                settings.theme === 'frostedGlass'
+                  ? isToday
+                    ? 'bg-white/90 backdrop-blur text-indigo-700 shadow-lg border border-white/50'
+                    : 'bg-white/70 backdrop-blur text-white border border-white/40'
+                  : settings.theme === 'cartoon'
+                  ? isToday
+                    ? 'bg-gradient-to-br from-pink-400 to-purple-500 text-white shadow-lg'
+                    : 'bg-white text-slate-700 border-2 border-pink-200'
+                  : isToday
                   ? 'bg-gradient-to-b from-blue-500 to-blue-600 text-white shadow-md'
                   : 'bg-gradient-to-b from-white to-slate-100 text-slate-700 border border-slate-200'
               }`}>
@@ -301,7 +454,7 @@ export function WeeklyCalendar({
       </div>
 
       {/* 全天待办区域 */}
-      {(() => {
+      {useMemo(() => {
         const weekAllDayEvents = weekDays.flatMap(day => {
           const dateKey = format(day, 'yyyy-MM-dd');
           const dayEvents = filteredEventIds
@@ -313,18 +466,30 @@ export function WeeklyCalendar({
         if (weekAllDayEvents.length === 0) return null;
 
         return (
-          <div className="flex border-b border-slate-200 bg-slate-50">
-            <div className="w-14 flex-shrink-0 bg-slate-100 border-r border-slate-200">
+          <div className={`flex border-b ${
+            settings.theme === 'frostedGlass'
+              ? 'border-white/30 bg-white/20 backdrop-blur'
+              : 'border-slate-200 bg-slate-50'
+          }`}>
+            <div className={`w-14 flex-shrink-0 border-r ${
+              settings.theme === 'frostedGlass'
+                ? 'border-white/30 bg-white/20 backdrop-blur'
+                : 'bg-slate-100 border-slate-200'
+            }`}>
               <div className="h-full flex items-center justify-center">
-                <span className="text-xs text-slate-500 font-medium">全天</span>
+                <span className={`text-xs font-medium ${
+                  settings.theme === 'frostedGlass' ? 'text-white/80' : 'text-slate-500'
+                }`}>全天</span>
               </div>
             </div>
             <div className="flex-1 flex gap-1 px-1 py-1 overflow-x-auto">
               {weekAllDayEvents.map((event) => (
                 <div
                   key={event.id}
-                  className={`flex-shrink-0 px-2 py-0.5 rounded text-xs text-white cursor-pointer hover:opacity-80 transition-opacity ${
-                    event.isUrgent ? 'bg-red-500' : 'bg-blue-500'
+                  className={`flex-shrink-0 px-2 py-0.5 rounded text-xs text-white cursor-pointer hover:opacity-80 transition-opacity backdrop-blur ${
+                    settings.theme === 'frostedGlass'
+                      ? event.isUrgent ? 'bg-red-400/80' : 'bg-blue-400/80'
+                      : event.isUrgent ? 'bg-red-500' : 'bg-blue-500'
                   } ${event.completed ? 'opacity-50 line-through' : ''}`}
                   onClick={() => handleEventClick(event)}
                 >
@@ -334,24 +499,34 @@ export function WeeklyCalendar({
             </div>
           </div>
         );
-      })()}
+      }, [weekDays, filteredEventIds, getEventsByDate, handleEventClick])}
 
       {/* 日历主体 */}
-      <div className="flex flex-1 overflow-hidden calendar-grid">
+      <div className="flex flex-1 min-h-0 calendar-grid">
         <div
           ref={scrollRef}
           className="flex flex-1 overflow-y-auto overflow-x-hidden"
         >
           <div className="flex flex-1 min-w-0">
             {/* 左侧时间标签栏 */}
-            <div className="w-14 flex-shrink-0 bg-slate-50 border-r border-slate-200">
+            <div className={`w-14 flex-shrink-0 border-r ${
+              settings.theme === 'frostedGlass'
+                ? 'bg-black/20 border-white/20'
+                : settings.theme === 'cartoon'
+                ? 'bg-pink-50 border-pink-200'
+                : 'bg-slate-50 border-slate-200'
+            }`}>
               {hours.map((hour) => (
                 <div
                   key={hour}
                   className="text-right pr-2 relative"
                   style={{ height: `${HOUR_HEIGHT}px` }}
                 >
-                  <span className="text-xs text-slate-400 font-medium absolute right-2 top-0">
+                  <span className={`text-xs font-medium absolute right-2 top-0 ${
+                    settings.theme === 'frostedGlass'
+                      ? 'text-white font-bold'
+                      : 'text-slate-400'
+                  }`}>
                     {hour.toString().padStart(2, '0')}:00
                   </span>
                 </div>
@@ -377,11 +552,16 @@ export function WeeklyCalendar({
                     onEventUpdate={handleEventUpdate}
                     isToday={format(day, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')}
                     showHeader={false}
+                    theme={settings.theme as 'skeuomorphic' | 'cartoon' | 'frostedGlass'}
                     draggingEvent={draggingEvent}
                     dragPreview={dragPreview}
                     isDragging={isDragging}
                     onDragStart={handleDragStart}
                     dragMovedRef={dragMovedRef}
+                    onStickyNoteDrop={handleStickyNoteDrop}
+                    stickyNoteDragHint={stickyNoteDragHint}
+                    onStickyNoteDragOver={handleStickyNoteDragOver}
+                    defaultEventDuration={parseInt(settings.defaultEventDuration)}
                   />
                 );
               })}

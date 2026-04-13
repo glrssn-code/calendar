@@ -1,6 +1,6 @@
 import { CalendarEvent } from '@/types/event';
+import { eventDB } from './db';
 
-const STORAGE_KEY = 'calendar_events';
 const STORAGE_VERSION = 1;
 
 interface StorageData {
@@ -26,43 +26,29 @@ interface LegacyEvent {
 }
 
 /**
- * 从 LocalStorage 加载事件
+ * 从 IndexedDB 加载事件
  */
-export function loadEvents(): CalendarEvent[] {
-  if (typeof window === 'undefined') return [];
-
+export async function loadEvents(): Promise<CalendarEvent[]> {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if (!data) return [];
-
-    const parsed: StorageData = JSON.parse(data);
-
-    // 版本迁移
-    const events = migrateEvents(parsed.events, parsed.version);
-
+    const events = await eventDB.getAll();
     return events;
   } catch (error) {
-    console.error('Failed to load events from localStorage:', error);
+    console.error('Failed to load events from IndexedDB:', error);
     return [];
   }
 }
 
 /**
- * 保存事件到 LocalStorage
+ * 保存事件到 IndexedDB（已废弃，使用 eventDB.put）
  */
-export function saveEvents(events: CalendarEvent[]): boolean {
-  if (typeof window === 'undefined') return false;
-
+export async function saveEvents(events: CalendarEvent[]): Promise<boolean> {
   try {
-    const data: StorageData = {
-      version: STORAGE_VERSION,
-      events,
-      lastUpdated: new Date().toISOString(),
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const db = (await import('./db')).getDB();
+    await db.events.clear();
+    await db.events.bulkAdd(events);
     return true;
   } catch (error) {
-    console.error('Failed to save events to localStorage:', error);
+    console.error('Failed to save events to IndexedDB:', error);
     return false;
   }
 }
@@ -70,16 +56,8 @@ export function saveEvents(events: CalendarEvent[]): boolean {
 /**
  * 清除所有事件
  */
-export function clearEvents(): boolean {
-  if (typeof window === 'undefined') return false;
-
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-    return true;
-  } catch (error) {
-    console.error('Failed to clear events from localStorage:', error);
-    return false;
-  }
+export async function clearEvents(): Promise<void> {
+  await eventDB.clear();
 }
 
 /**
@@ -139,24 +117,20 @@ function migrateEvents(events: CalendarEvent[] | LegacyEvent[], fromVersion: num
 /**
  * 获取存储状态信息
  */
-export function getStorageInfo(): { eventCount: number; lastUpdated: string | null; storageSize: string } {
-  if (typeof window === 'undefined') {
-    return { eventCount: 0, lastUpdated: null, storageSize: '0 B' };
-  }
-
+export async function getStorageInfo(): Promise<{ eventCount: number; lastUpdated: string | null; storageSize: string }> {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if (!data) {
-      return { eventCount: 0, lastUpdated: null, storageSize: '0 B' };
-    }
+    const events = await eventDB.getAll();
+    const lastEvent = events.length > 0
+      ? events.reduce((latest, e) => e.createdAt > latest.createdAt ? e : latest)
+      : null;
 
-    const parsed: StorageData = JSON.parse(data);
-    const size = new Blob([data]).size;
+    // IndexedDB 没有直接的存储大小 API，返回估算值
+    const estimatedSize = new Blob([JSON.stringify(events)]).size;
 
     return {
-      eventCount: parsed.events.length,
-      lastUpdated: parsed.lastUpdated ? new Date(parsed.lastUpdated).toLocaleString('zh-CN') : null,
-      storageSize: formatBytes(size),
+      eventCount: events.length,
+      lastUpdated: lastEvent ? new Date(lastEvent.createdAt).toLocaleString('zh-CN') : null,
+      storageSize: formatBytes(estimatedSize),
     };
   } catch (error) {
     console.error('Failed to get storage info:', error);

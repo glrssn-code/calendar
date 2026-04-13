@@ -15,9 +15,10 @@ import {
 } from '@/components/ui/select';
 import { TimePicker } from '@/components/ui/time-picker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { CalendarEvent, EventColor, NewEvent, CATEGORIES, CATEGORY_COLORS } from '@/types/event';
+import { CalendarEvent, EventColor, NewEvent, CATEGORY_OPTIONS, CATEGORY_COLORS } from '@/types/event';
 import { parseChineseDateTime, formatParsedResult, isValidParsedResult } from '@/lib/nlpParser';
 import { Sparkles, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
+import { COLOR_CATEGORY_MAP } from '@/lib/constants';
 
 interface EventFormProps {
   initialDate?: Date;
@@ -29,15 +30,6 @@ interface EventFormProps {
   defaultUseSmartInput?: boolean;
   defaultDuration?: number;
 }
-
-const CATEGORY_OPTIONS: { value: string; label: string; class: string }[] = [
-  { value: '售前', label: '售前', class: 'bg-orange-500' },
-  { value: '项目', label: '项目', class: 'bg-amber-500' },
-  { value: '会议', label: '会议', class: 'bg-blue-500' },
-  { value: '管理', label: '管理', class: 'bg-indigo-500' },
-  { value: '推广', label: '推广', class: 'bg-purple-500' },
-  { value: '其它', label: '其它', class: 'bg-green-500' },
-];
 
 const REMINDER_OPTIONS = [
   { value: 0, label: '开始时提醒' },
@@ -118,6 +110,25 @@ export function EventForm({
   const [isUrgent, setIsUrgent] = useState(initialEvent?.isUrgent || false);
   const [isAllDay, setIsAllDay] = useState(initialEvent?.isAllDay || false);
 
+  // 比较两个时间，返回 -1 (t1<t2), 0 (t1==t2), 1 (t1>t2)
+  const compareTimes = (t1: string, t2: string): number => {
+    const [h1, m1] = t1.split(':').map(Number);
+    const [h2, m2] = t2.split(':').map(Number);
+    if (h1 !== h2) return h1 - h2;
+    return m1 - m2;
+  };
+
+  // 给定时间加上指定分钟数，返回新时间字符串
+  const addMinutes = (time: string, minutesToAdd: number): string => {
+    const [h, m] = time.split(':').map(Number);
+    let totalM = h * 60 + m + minutesToAdd;
+    if (totalM < 0) totalM += 24 * 60; // 处理跨天（假设在同一天内）
+    if (totalM >= 24 * 60) totalM -= 24 * 60;
+    const newH = Math.floor(totalM / 60);
+    const newM = totalM % 60;
+    return `${newH.toString().padStart(2, '0')}:${newM.toString().padStart(2, '0')}`;
+  };
+
   // 计算默认结束时间（开始时间 + defaultDuration分钟）
   const getDefaultEndTime = (start: string): string => {
     const [h, m] = start.split(':').map(Number);
@@ -134,8 +145,11 @@ export function EventForm({
   // 处理开始时间变化
   const handleStartTimeChange = (newStartTime: string) => {
     setStartTime(newStartTime);
-    // 只有当结束时间没有被手动设置过时，才自动调整结束时间
-    if (!endTimeManuallySet) {
+    // 如果新开始时间晚于或等于结束时间，自动调整结束时间
+    if (compareTimes(newStartTime, endTime) >= 0) {
+      setEndTime(addMinutes(newStartTime, 5));
+      setEndTimeManuallySet(false);
+    } else if (!endTimeManuallySet) {
       setEndTime(getDefaultEndTime(newStartTime));
     }
   };
@@ -144,6 +158,11 @@ export function EventForm({
   const handleEndTimeChange = (newEndTime: string) => {
     setEndTime(newEndTime);
     setEndTimeManuallySet(true);
+    // 如果新结束时间早于或等于开始时间，自动调整开始时间
+    if (compareTimes(newEndTime, startTime) <= 0) {
+      setStartTime(addMinutes(newEndTime, -5));
+      setEndTimeManuallySet(false);
+    }
   };
 
   function hasReminderFromInitial(): boolean {
@@ -168,10 +187,11 @@ export function EventForm({
         const endDate = new Date(result.date.getTime() + result.duration * 60 * 1000);
         setEndTime(format(endDate, 'HH:mm'));
         setEndTimeManuallySet(false);
-        setReminderEnabled(result.hasReminder);
-        if (result.hasReminder) {
-          setReminderMinutes(0);
-        }
+        // 不自动设置提醒，由用户决定
+        // setReminderEnabled(result.hasReminder);
+        // if (result.hasReminder) {
+        //   setReminderMinutes(0);
+        // }
       } else {
         setSmartPreview(null);
       }
@@ -193,8 +213,8 @@ export function EventForm({
       date: format(result.date, 'yyyy-MM-dd'),
       startTime: format(result.date, 'HH:mm'),
       endTime: format(endDate, 'HH:mm'),
-      reminderEnabled: result.hasReminder,
-      reminderMinutes: 0, // 默认开始时提醒
+      reminderEnabled, // 使用用户设置的提醒选项
+      reminderMinutes: reminderEnabled ? 0 : 0, // 开始时提醒
       isUrgent: result.isUrgent,
       category: smartCategory,
       color: result.isUrgent ? 'blue' : CATEGORY_COLORS[smartCategory],
@@ -308,21 +328,21 @@ export function EventForm({
 
       {useSmartInput ? (
         /* 智能输入模式 */
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label className="text-slate-700 font-medium">智能创建</Label>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-slate-700 font-medium text-sm">智能创建</Label>
 <input
               ref={smartInputRef}
               type="text"
               value={smartInput}
               onChange={(e) => setSmartInput(e.target.value)}
               placeholder='例如：明天下午两点提醒我开会'
-              className="h-8 w-full min-w-0 rounded-lg border border-indigo-200 bg-gradient-to-r from-indigo-50/50 to-purple-50/50 px-2.5 py-1 text-base transition-colors outline-none focus:border-indigo-400 focus:ring-3 focus:ring-indigo-400/20"
+              className="h-8 w-full min-w-0 rounded-lg border border-indigo-200 bg-gradient-to-r from-indigo-50/50 to-purple-50/50 px-2.5 py-1 text-sm transition-colors outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20"
             />
             {smartPreview && (
-              <div className="flex items-center gap-2 p-3 bg-indigo-50 rounded-lg border border-indigo-100">
-                <Calendar className="w-4 h-4 text-indigo-500" />
-                <span className="text-sm text-indigo-600">{smartPreview}</span>
+              <div className="flex items-center gap-2 p-2 bg-indigo-50 rounded-lg border border-indigo-100">
+                <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                <span className="text-xs text-indigo-600">{smartPreview}</span>
               </div>
             )}
             <p className="text-xs text-slate-400">
@@ -331,20 +351,31 @@ export function EventForm({
           </div>
 
           {/* 紧急事件开关 */}
-          <div className="flex items-center justify-between py-3 px-4 bg-slate-50 rounded-lg">
-            <div className="space-y-0.5">
-              <Label className="text-slate-700 font-medium">紧急事件</Label>
-              <p className="text-sm text-slate-400">红色高亮显示，更醒目</p>
+          <div className="flex items-center justify-between py-2 px-3 bg-slate-50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Label className="text-slate-700 font-medium text-sm">紧急事件</Label>
             </div>
             <Switch
               checked={isUrgent}
               onCheckedChange={setIsUrgent}
-              className="data-[checked]:bg-rose-500"
+              className="data-[checked]:bg-rose-500 scale-90"
+            />
+          </div>
+
+          {/* 提醒开关 */}
+          <div className="flex items-center justify-between py-2 px-3 bg-slate-50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Label className="text-slate-700 font-medium text-sm">提醒</Label>
+            </div>
+            <Switch
+              checked={reminderEnabled}
+              onCheckedChange={setReminderEnabled}
+              className="data-[checked]:bg-blue-500 scale-90"
             />
           </div>
 
           {/* 事件类别 */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label className="text-slate-700 font-medium text-sm">事件类别</Label>
             <div className="flex gap-1.5">
               {CATEGORY_OPTIONS.map((option) => (
@@ -352,7 +383,7 @@ export function EventForm({
                   key={option.value}
                   type="button"
                   onClick={() => setCategory(option.value)}
-                  className={`px-2 py-1 rounded-full ${option.class} text-white text-xs font-medium transition-all ${
+                  className={`px-2 py-0.5 rounded-full ${COLOR_CATEGORY_MAP[option.color].bg} text-white text-xs font-medium transition-all ${
                     category === option.value
                       ? 'ring-2 ring-offset-1 ring-slate-400'
                       : 'opacity-70 hover:opacity-100'
@@ -369,9 +400,9 @@ export function EventForm({
               type="button"
               onClick={handleSmartSubmit}
               disabled={!smartPreview}
-              className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-lg"
+              className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-lg h-8"
             >
-              <Sparkles className="w-4 h-4 mr-2" />
+              <Sparkles className="w-4 h-4 mr-1" />
               智能创建
             </Button>
           </div>
@@ -379,166 +410,154 @@ export function EventForm({
       ) : (
         /* 普通输入模式 */
         <>
-          <div className="space-y-2">
-            <Label htmlFor="title" className="text-slate-700 font-medium">事件标题</Label>
-            <Input
-              ref={titleInputRef}
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="输入事件标题"
-              className="border-slate-200 focus:border-blue-400 focus:ring-blue-400/20"
-              required
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="title" className="text-slate-700 font-medium text-sm">事件标题</Label>
+              <Input
+                ref={titleInputRef}
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="输入事件标题"
+                className="border-slate-200 focus:border-blue-400 h-9"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="date" className="text-slate-700 font-medium text-sm">日期</Label>
+              <Input
+                id="date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="border-slate-200 focus:border-blue-400 h-9"
+                required
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="description" className="text-slate-700 font-medium">事件内容</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="description" className="text-slate-700 font-medium text-sm">事件内容</Label>
             <textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="输入事件内容（可选）"
-              className="w-full min-h-[80px] px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/20 focus:border-blue-400 resize-none"
+              className="w-full min-h-[50px] px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/20 focus:border-blue-400 resize-none"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="date" className="text-slate-700 font-medium">日期</Label>
-            <Input
-              id="date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="border-slate-200 focus:border-blue-400 focus:ring-blue-400/20"
-              required
-            />
-          </div>
+          {/* 提醒 + 紧急事件 + 全天 放一行 */}
+          <div className="grid grid-cols-3 gap-2">
+            {!isAllDay && (
+              <div className="flex items-center justify-between py-2 px-2 bg-slate-50 rounded-lg">
+                <Label htmlFor="reminder" className="text-slate-700 font-medium text-xs">提醒</Label>
+                <Switch
+                  id="reminder"
+                  checked={reminderEnabled}
+                  onCheckedChange={setReminderEnabled}
+                  className="data-[checked]:bg-blue-500 scale-90"
+                />
+              </div>
+            )}
 
-          {/* 全天待办开关 */}
-          <div className="flex items-center justify-between py-2.5 px-4 bg-slate-50 rounded-lg">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="allDay" className="text-slate-700 font-medium text-sm">全天待办</Label>
-              <span className="text-xs text-slate-400">(无具体时间)</span>
+            <div className="flex items-center justify-between py-2 px-2 bg-slate-50 rounded-lg">
+              <Label className="text-slate-700 font-medium text-xs">紧急</Label>
+              <Switch
+                checked={isUrgent}
+                onCheckedChange={setIsUrgent}
+                className="data-[checked]:bg-rose-500 scale-90"
+              />
             </div>
-            <Switch
-              id="allDay"
-              checked={isAllDay}
-              onCheckedChange={(checked) => {
-                setIsAllDay(checked);
-                if (checked) {
-                  setReminderEnabled(false);
-                }
-              }}
-              className="data-[checked]:bg-blue-500"
-            />
+
+            <div className="flex items-center justify-between py-2 px-2 bg-slate-50 rounded-lg">
+              <Label htmlFor="allDay" className="text-slate-700 font-medium text-xs">全天</Label>
+              <Switch
+                id="allDay"
+                checked={isAllDay}
+                onCheckedChange={(checked) => {
+                  setIsAllDay(checked);
+                  if (checked) setReminderEnabled(false);
+                }}
+                className="data-[checked]:bg-blue-500 scale-90"
+              />
+            </div>
           </div>
 
           {/* 时间选择 - 全天待办时隐藏 */}
           {!isAllDay && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-slate-700 font-medium">开始时间</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-slate-700 font-medium text-xs">开始时间</Label>
                 <TimePicker value={startTime} onChange={handleStartTimeChange} />
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-slate-700 font-medium">结束时间</Label>
+              <div className="space-y-1">
+                <Label className="text-slate-700 font-medium text-xs">结束时间</Label>
                 <TimePicker value={endTime} onChange={handleEndTimeChange} />
               </div>
             </div>
           )}
 
-          {/* 开启提醒 + 紧急事件 放一行 */}
-          <div className="grid grid-cols-2 gap-4">
-            {!isAllDay && (
-              <div className="flex items-center justify-between py-2.5 px-4 bg-slate-50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="reminder" className="text-slate-700 font-medium text-sm">开启提醒</Label>
-                </div>
-                <Switch
-                  id="reminder"
-                  checked={reminderEnabled}
-                  onCheckedChange={setReminderEnabled}
-                  className="data-[checked]:bg-blue-500"
-                />
-              </div>
-            )}
-
-            <div className="flex items-center justify-between py-2.5 px-4 bg-slate-50 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Label className="text-slate-700 font-medium text-sm">紧急事件</Label>
-              </div>
-              <Switch
-                checked={isUrgent}
-                onCheckedChange={setIsUrgent}
-                className="data-[checked]:bg-rose-500"
-              />
-            </div>
-          </div>
-
-          {/* 提醒时间 + 事件类别 放一行 */}
-          <div className="grid grid-cols-2 gap-4">
-            {reminderEnabled ? (
-              <div className="space-y-1.5">
-                <Label htmlFor="reminderTime" className="text-slate-700 font-medium text-sm">提醒时间</Label>
-                <Select
-                  value={reminderMinutes.toString()}
-                  onValueChange={(v) => setReminderMinutes(Number(v))}
-                >
-                  <SelectTrigger className="border-slate-200 focus:border-blue-400 h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {REMINDER_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value.toString()}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div />
-            )}
-
+          {/* 提醒时间 - 如果开启 */}
+          {reminderEnabled && !isAllDay && (
             <div className="space-y-1.5">
-              <Label className="text-slate-700 font-medium text-sm">事件类别</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {CATEGORY_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setCategory(option.value)}
-                    className={`px-2 py-1 rounded-full ${option.class} text-white text-xs font-medium transition-all ${
-                      category === option.value
-                        ? 'ring-2 ring-offset-2 ring-slate-400'
-                        : 'opacity-70 hover:opacity-100'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+              <Label className="text-slate-700 font-medium text-xs">提前提醒时间</Label>
+              <Select
+                value={reminderMinutes.toString()}
+                onValueChange={(v) => setReminderMinutes(Number(v))}
+              >
+                <SelectTrigger className="border-slate-200 focus:border-blue-400 h-8 text-sm">
+                  <SelectValue placeholder="选择提前提醒时间" />
+                </SelectTrigger>
+                <SelectContent>
+                  {REMINDER_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value.toString()}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* 事件类别 */}
+          <div className="space-y-1.5">
+            <Label className="text-slate-700 font-medium text-sm">事件类别</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {CATEGORY_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setCategory(option.value)}
+                  className={`px-2 py-1 rounded-full ${COLOR_CATEGORY_MAP[option.color].bg} text-white text-xs font-medium transition-all ${
+                    category === option.value
+                      ? 'ring-2 ring-offset-2 ring-slate-400'
+                      : 'opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
           </div>
         </>
       )}
 
-      <div className="flex justify-between pt-4 border-t border-slate-100">
+      <div className="flex justify-between items-center pt-3 border-t border-slate-100">
         <div>
           {initialEvent && onDelete && (
-            <Button type="button" variant="destructive" onClick={onDelete} className="bg-rose-500 hover:bg-rose-600 text-white">
+            <Button type="button" variant="destructive" onClick={onDelete} className="bg-rose-500 hover:bg-rose-600 text-white h-8">
               删除
             </Button>
           )}
         </div>
-        <div className="flex gap-3">
-          <Button type="button" variant="outline" onClick={onCancel} className="border-slate-200 text-slate-600 hover:bg-slate-50">
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={onCancel} className="border-slate-200 text-slate-600 hover:bg-slate-50 h-8">
             取消
           </Button>
           {!useSmartInput && (
-            <Button type="submit" className="bg-blue-500 hover:bg-blue-600 text-white">
+            <Button type="submit" className="bg-blue-500 hover:bg-blue-600 text-white h-8">
               {initialEvent ? '保存' : '创建'}
             </Button>
           )}

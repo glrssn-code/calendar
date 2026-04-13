@@ -19,35 +19,66 @@ const GRAVITY = 0.35;
 const FLAP_STRENGTH = -6;
 const PIPE_WIDTH = 50;
 const PIPE_GAP = 220;
-const PIPE_SPEED = 2;
-const BIRD_X = 250;
+const PIPE_SPEED = 2.2; // 速度提升10%
 
 interface FlappyBirdProps {
   onExit: () => void;
 }
 
+const HIGH_SCORE_KEY = 'flappy_bird_high_score';
+
+// 从 localStorage 加载最高分
+const loadHighScore = (): number => {
+  if (typeof window === 'undefined') return 0;
+  try {
+    const saved = localStorage.getItem(HIGH_SCORE_KEY);
+    return saved ? parseInt(saved, 10) : 0;
+  } catch {
+    return 0;
+  }
+};
+
+// 保存最高分到 localStorage
+const saveHighScore = (score: number) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(HIGH_SCORE_KEY, score.toString());
+  } catch {
+    // 忽略存储错误
+  }
+};
+
 export function FlappyBird({ onExit }: FlappyBirdProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameState, setGameState] = useState<'playing' | 'dead' | 'waiting'>('waiting');
   const [score, setScore] = useState(0);
-  const [highScore, setHighScore] = useState(0);
-  const birdRef = useRef<Bird>({ x: BIRD_X, y: 200, vy: 0, rotation: 0 });
+  const [highScore, setHighScore] = useState(loadHighScore);
+  const birdRef = useRef<Bird>({ x: 0, y: 200, vy: 0, rotation: 0 });
   const pipesRef = useRef<Pipe[]>([]);
   const animationRef = useRef<number | undefined>(undefined);
   const gameStateRef = useRef(gameState);
   const scoreRef = useRef(score);
   const onExitRef = useRef(onExit);
+  const canvasSizeRef = useRef({ width: 0, height: 0 });
+  const BIRD_X_REF = useRef(0);
   onExitRef.current = onExit;
+
+  // 计算小鸟 X 位置
+  const getBirdX = useCallback(() => {
+    return canvasSizeRef.current.width / 3;
+  }, []);
 
   // 重置游戏
   const resetGame = useCallback(() => {
-    birdRef.current = { x: BIRD_X, y: 200, vy: 0, rotation: 0 };
+    const birdX = getBirdX();
+    birdRef.current = { x: birdX, y: 200, vy: 0, rotation: 0 };
+    BIRD_X_REF.current = birdX;
     pipesRef.current = [];
     setScore(0);
     scoreRef.current = 0;
     setGameState('waiting');
     gameStateRef.current = 'waiting';
-  }, []);
+  }, [getBirdX]);
 
   // 开始游戏
   const startGame = useCallback(() => {
@@ -96,6 +127,13 @@ export function FlappyBird({ onExit }: FlappyBirdProps) {
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
+      canvasSizeRef.current = { width: canvas.width, height: canvas.height };
+      const birdX = canvas.width / 3;
+      BIRD_X_REF.current = birdX;
+      // 如果是等待状态，更新小鸟位置
+      if (gameStateRef.current === 'waiting') {
+        birdRef.current.x = birdX;
+      }
     };
     resizeCanvas();
 
@@ -128,6 +166,7 @@ export function FlappyBird({ onExit }: FlappyBirdProps) {
           gameStateRef.current = 'dead';
           if (scoreRef.current > highScore) {
             setHighScore(scoreRef.current);
+            saveHighScore(scoreRef.current);
           }
         }
 
@@ -154,6 +193,7 @@ export function FlappyBird({ onExit }: FlappyBirdProps) {
             gameStateRef.current = 'dead';
             if (scoreRef.current > highScore) {
               setHighScore(scoreRef.current);
+              saveHighScore(scoreRef.current);
             }
           }
 
@@ -245,7 +285,7 @@ export function FlappyBird({ onExit }: FlappyBirdProps) {
         ctx.font = 'bold 36px Arial';
         ctx.fillText('点击屏幕或按空格开始', canvas.width / 2, canvas.height / 2 - 50);
         ctx.font = '24px Arial';
-        ctx.fillText('按 ESC 退出', canvas.width / 2, canvas.height / 2);
+        ctx.fillText('按 ESC 或点击退出按钮退出', canvas.width / 2, canvas.height / 2);
       }
 
       // 死亡状态
@@ -263,7 +303,7 @@ export function FlappyBird({ onExit }: FlappyBirdProps) {
 
         ctx.font = '24px Arial';
         ctx.fillText('点击屏幕重新开始', canvas.width / 2, canvas.height / 2 + 90);
-        ctx.fillText('按 ESC 退出', canvas.width / 2, canvas.height / 2 + 130);
+        ctx.fillText('按 ESC 或点击退出按钮退出', canvas.width / 2, canvas.height / 2 + 130);
       }
 
       animationRef.current = requestAnimationFrame(animate);
@@ -279,7 +319,21 @@ export function FlappyBird({ onExit }: FlappyBirdProps) {
   }, [highScore]);
 
   // 点击事件处理
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // 检查是否点击了右上角的退出按钮区域
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      // 退出按钮区域 (右上角)
+      if (x >= canvas.width - 90 && x <= canvas.width - 10 && y >= 10 && y <= 50) {
+        exitGame();
+        return;
+      }
+    }
+
     if (gameStateRef.current === 'dead') {
       resetGame();
       setGameState('waiting');
@@ -298,8 +352,17 @@ export function FlappyBird({ onExit }: FlappyBirdProps) {
         className="w-full h-full cursor-pointer"
         onClick={handleClick}
       />
-      <div className="absolute top-4 right-4 text-right text-white">
-        <p className="text-sm opacity-70">按 ESC 退出</p>
+      {/* 退出按钮 */}
+      <button
+        onClick={exitGame}
+        className="absolute top-3 right-3 px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg shadow-lg transition-colors cursor-pointer"
+        style={{ zIndex: 60 }}
+      >
+        退出
+      </button>
+      {/* 左上角提示 */}
+      <div className="absolute top-4 left-4 text-white text-sm opacity-70">
+        空格/上/右 飞行
       </div>
     </div>
   );

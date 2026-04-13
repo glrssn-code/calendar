@@ -3,9 +3,21 @@ import { CalendarEvent } from '@/types/event';
 import { exportEventsToJSON } from './storage';
 
 /**
- * 导出事件为 JSON 文件
+ * 导出事件为 JSON 文件（简化格式）
+ * 格式：类别：标题（每个事件一行）
  */
 export function downloadAsJSON(events: CalendarEvent[], filename: string = 'calendar-events.json'): void {
+  // 按类别分组并生成简化文本
+  const lines = events.map(event => `${event.category}：${event.title}`);
+  const content = lines.join('\n');
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  downloadBlob(blob, filename);
+}
+
+/**
+ * 导出事件为 JSON 文件（完整 JSON 格式）
+ */
+export function downloadAsFullJSON(events: CalendarEvent[], filename: string = 'calendar-events.json'): void {
   const jsonString = exportEventsToJSON(events);
   const blob = new Blob([jsonString], { type: 'application/json' });
   downloadBlob(blob, filename);

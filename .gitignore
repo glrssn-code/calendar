@@ -39,3 +39,20 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Electron build
+dist-electron/
+
+# Web build
+dist-web/
+
+# Calendar portable
+calendar-portable/
+
+# Distribution zip files
+*.zip
+
+# Compiled Electron TypeScript (we track the source files)
+electron/*.ts
+!electron/main.ts
+!electron/preload.ts

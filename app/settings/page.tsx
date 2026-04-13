@@ -11,9 +11,12 @@ import { Settings, Bell, Palette, Calendar, Clock, Globe, ArrowLeft, Download, U
 import Link from 'next/link';
 import { downloadAsJSON, downloadAsExcel, generateFilename } from '@/lib/export';
 import { getStorageInfo, loadEvents, saveEvents, clearEvents, importEventsFromJSON } from '@/lib/storage';
+import { ExportDialog } from '@/components/export/ExportDialog';
 import { CalendarEvent } from '@/types/event';
 import { FlappyBird } from '@/components/FlappyBird';
 import { useSettings } from '@/hooks/useSettings';
+import { createBackup, downloadBackup, generateBackupFilename, parseBackupFile, restoreBackupMerge, restoreBackupReplace, getBackupStats } from '@/lib/backup';
+import { hasLocalBackup, getLocalBackupStats, restoreLocalBackupToIndexedDB, exportLocalBackup } from '@/lib/autoBackup';
 
 export default function SettingsPage() {
   const { settings, saveSettings, isLoaded } = useSettings();
@@ -26,16 +29,26 @@ export default function SettingsPage() {
   const [showClearButton, setShowClearButton] = useState(false);
   const [developerClickCount, setDeveloperClickCount] = useState(0);
   const [showFlappyBird, setShowFlappyBird] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showExportJSONDialog, setShowExportJSONDialog] = useState(false);
+  const [exportEvents, setExportEvents] = useState<CalendarEvent[]>([]);
   const developerClickCountRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showBackupDialog, setShowBackupDialog] = useState(false);
+  const [backupPreview, setBackupPreview] = useState<{ eventCount: number; noteCount: number } | null>(null);
+  const [importBackupPreview, setImportBackupPreview] = useState<{ data: any; eventCount: number; noteCount: number } | null>(null);
+  const [importBackupError, setImportBackupError] = useState<string | null>(null);
+  const backupFileInputRef = useRef<HTMLInputElement>(null);
+  const [localBackupInfo, setLocalBackupInfo] = useState<{ hasBackup: boolean; eventCount: number; noteCount: number; lastSync: string | null }>({ hasBackup: false, eventCount: 0, noteCount: 0, lastSync: null });
 
   // 刷新存储信息
-  const refreshStorageInfo = () => {
-    setStorageInfo(getStorageInfo());
+  const refreshStorageInfo = async () => {
+    const info = await getStorageInfo();
+    setStorageInfo(info);
   };
 
   useEffect(() => {
-    refreshStorageInfo();
+    refreshStorageInfoWithNotes();
     // 每次进入页面时重置版本号点击次数和清除按钮状态
     setVersionClickCount(0);
     setShowClearButton(false);
@@ -49,16 +62,28 @@ export default function SettingsPage() {
     alert('设置已保存！');
   };
 
-  // 导出 JSON
-  const handleExportJSON = () => {
-    const events = loadEvents();
-    downloadAsJSON(events, generateFilename('calendar-events', 'json'));
+  // 导出 JSON - 打开对话框
+  const handleExportJSON = async () => {
+    const events = await loadEvents();
+    setExportEvents(events);
+    setShowExportJSONDialog(true);
   };
 
-  // 导出 Excel
-  const handleExportExcel = () => {
-    const events = loadEvents();
-    downloadAsExcel(events, generateFilename('calendar-events', 'xlsx'));
+  // 执行带过滤条件的 JSON 导出
+  const handleFilteredJSONExport = (filteredEvents: CalendarEvent[]) => {
+    downloadAsJSON(filteredEvents, generateFilename('calendar-events', 'json'));
+  };
+
+  // 导出 Excel - 打开对话框
+  const handleExportExcel = async () => {
+    const events = await loadEvents();
+    setExportEvents(events);
+    setShowExportDialog(true);
+  };
+
+  // 执行带过滤条件的 Excel 导出
+  const handleFilteredExport = (filteredEvents: CalendarEvent[]) => {
+    downloadAsExcel(filteredEvents, generateFilename('calendar-events', 'xlsx'));
   };
 
   // 处理文件选择
@@ -91,9 +116,9 @@ export default function SettingsPage() {
   };
 
   // 执行导入
-  const handleImport = (mode: 'merge' | 'replace') => {
+  const handleImport = async (mode: 'merge' | 'replace') => {
     if (importPreview) {
-      const existingEvents = loadEvents();
+      const existingEvents = await loadEvents();
       let finalEvents: CalendarEvent[];
 
       if (mode === 'replace') {
@@ -105,20 +130,108 @@ export default function SettingsPage() {
         finalEvents = [...existingEvents, ...newEvents];
       }
 
-      saveEvents(finalEvents);
+      await saveEvents(finalEvents);
       setShowImportDialog(false);
       setImportPreview(null);
-      refreshStorageInfo();
+      refreshStorageInfoWithNotes();
       alert(`成功导入 ${importPreview.length} 个事件`);
     }
   };
 
   // 清除所有数据
-  const handleClearAll = () => {
-    clearEvents();
+  const handleClearAll = async () => {
+    await clearEvents();
     setShowClearDialog(false);
-    refreshStorageInfo();
+    refreshStorageInfoWithNotes();
     alert('所有事件已清除');
+  };
+
+  // 一键备份
+  const handleBackup = async () => {
+    const backup = await createBackup();
+    downloadBackup(backup, generateBackupFilename());
+  };
+
+  // 处理备份文件选择
+  const handleBackupFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const result = parseBackupFile(content);
+        if (result.success && result.data) {
+          setImportBackupPreview({
+            data: result.data,
+            eventCount: result.data.events.length,
+            noteCount: result.data.stickyNotes.length,
+          });
+          setImportBackupError(null);
+          setShowBackupDialog(true);
+        } else {
+          setImportBackupError(result.error || '导入失败');
+        }
+      } catch {
+        setImportBackupError('文件解析失败，请选择有效的备份文件');
+      }
+    };
+    reader.readAsText(file);
+
+    if (backupFileInputRef.current) {
+      backupFileInputRef.current.value = '';
+    }
+  };
+
+  // 执行备份导入 - 合并
+  const handleBackupImportMerge = async () => {
+    if (!importBackupPreview) return;
+    const result = await restoreBackupMerge(importBackupPreview.data);
+    setShowBackupDialog(false);
+    setImportBackupPreview(null);
+    refreshStorageInfoWithNotes();
+    alert(`成功导入 ${result.eventsImported} 个事件和 ${result.notesImported} 个便签`);
+  };
+
+  // 执行备份导入 - 替换
+  const handleBackupImportReplace = async () => {
+    if (!importBackupPreview) return;
+    const result = await restoreBackupReplace(importBackupPreview.data);
+    setShowBackupDialog(false);
+    setImportBackupPreview(null);
+    refreshStorageInfoWithNotes();
+    alert(`成功替换为 ${result.eventsImported} 个事件和 ${result.notesImported} 个便签`);
+  };
+
+  // 更新存储信息，显示便签数量
+  const refreshStorageInfoWithNotes = async () => {
+    const info = await getStorageInfo();
+    const stats = await getBackupStats();
+    const localStats = getLocalBackupStats();
+    setStorageInfo({
+      eventCount: stats.eventCount,
+      lastUpdated: info.lastUpdated,
+      storageSize: info.storageSize,
+    });
+    setLocalBackupInfo({
+      hasBackup: localStats.eventCount > 0 || localStats.noteCount > 0,
+      eventCount: localStats.eventCount,
+      noteCount: localStats.noteCount,
+      lastSync: localStats.lastSync,
+    });
+  };
+
+  // 从本地备份恢复
+  const handleRestoreFromLocal = async () => {
+    if (!confirm(`本地备份包含 ${localBackupInfo.eventCount} 个事件和 ${localBackupInfo.noteCount} 个便签，是否恢复？`)) {
+      return;
+    }
+    const result = await restoreLocalBackupToIndexedDB();
+    alert(`成功从本地备份恢复 ${result.eventsRestored} 个事件和 ${result.notesRestored} 个便签`);
+    refreshStorageInfoWithNotes();
+    // 刷新页面以加载恢复的数据
+    window.location.reload();
   };
 
   return (
@@ -284,17 +397,17 @@ export default function SettingsPage() {
                     preview: '🌈'
                   },
                   {
-                    value: 'frosted',
+                    value: 'frostedGlass',
                     bgGradient: 'from-blue-100/50 to-purple-100/50',
                     borderColor: 'border-blue-200',
-                    label: '磨玻璃',
-                    desc: '模糊透明现代感',
+                    label: '毛玻璃',
+                    desc: '玻璃质感现代科技',
                     preview: '✨'
                   },
                 ].map((theme) => (
                   <button
                     key={theme.value}
-                    onClick={() => saveSettings({ theme: theme.value as 'skeuomorphic' | 'cartoon' | 'frosted' })}
+                    onClick={() => saveSettings({ theme: theme.value as 'skeuomorphic' | 'cartoon' | 'frostedGlass' })}
                     className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
                       settings.theme === theme.value
                         ? 'border-blue-500 bg-blue-50 shadow-lg scale-105'
@@ -363,6 +476,71 @@ export default function SettingsPage() {
                 </Button>
               </div>
             </div>
+
+            {/* 一键备份 */}
+            <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-green-800">一键备份</p>
+                  <p className="text-sm text-green-600">导出所有事件和便签，防止数据丢失</p>
+                </div>
+                <Button
+                  onClick={handleBackup}
+                  className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  备份
+                </Button>
+              </div>
+            </div>
+
+            {/* 恢复备份 */}
+            <div className="space-y-3">
+              <Label className="text-slate-700 font-medium">恢复备份</Label>
+              <input
+                ref={backupFileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleBackupFileChange}
+                className="hidden"
+              />
+              <Button
+                onClick={() => backupFileInputRef.current?.click()}
+                variant="outline"
+                className="w-full border-slate-200 hover:bg-slate-50"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                选择备份文件导入
+              </Button>
+              {importBackupError && (
+                <p className="text-sm text-red-500">{importBackupError}</p>
+              )}
+            </div>
+
+            {/* 本地自动备份恢复 */}
+            {localBackupInfo.hasBackup && (
+              <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-amber-800">本地自动备份</p>
+                    <p className="text-sm text-amber-600">
+                      {localBackupInfo.eventCount} 个事件，{localBackupInfo.noteCount} 个便签
+                    </p>
+                    {localBackupInfo.lastSync && (
+                      <p className="text-xs text-amber-500 mt-1">
+                        上次备份：{new Date(localBackupInfo.lastSync).toLocaleString('zh-CN')}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    onClick={handleRestoreFromLocal}
+                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
+                  >
+                    恢复
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* 导入 */}
             <div className="space-y-3">
@@ -522,8 +700,57 @@ export default function SettingsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* 备份恢复对话框 */}
+      <Dialog open={showBackupDialog} onOpenChange={setShowBackupDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>恢复备份</DialogTitle>
+            <DialogDescription>
+              备份包含 {importBackupPreview?.eventCount || 0} 个事件和 {importBackupPreview?.noteCount || 0} 个便签，请选择恢复方式：
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm text-slate-500">
+              · <strong>合并</strong>：保留现有数据，添加备份中的新数据（推荐）
+            </p>
+            <p className="text-sm text-slate-500">
+              · <strong>替换</strong>：用备份数据完全替换现有数据（会丢失现有数据）
+            </p>
+          </div>
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button variant="outline" onClick={() => setShowBackupDialog(false)} className="w-full">
+              取消
+            </Button>
+            <Button onClick={handleBackupImportMerge} className="w-full bg-green-500 hover:bg-green-600 text-white">
+              合并导入
+            </Button>
+            <Button onClick={handleBackupImportReplace} variant="outline" className="w-full border-red-200 text-red-500 hover:bg-red-50">
+              替换全部
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Flappy Bird 彩蛋 */}
       {showFlappyBird && <FlappyBird onExit={() => setShowFlappyBird(false)} />}
+
+      {/* 导出对话框 */}
+      <ExportDialog
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        events={exportEvents}
+        onExport={handleFilteredExport}
+        exportType="excel"
+      />
+
+      {/* JSON 导出对话框 */}
+      <ExportDialog
+        isOpen={showExportJSONDialog}
+        onClose={() => setShowExportJSONDialog(false)}
+        events={exportEvents}
+        onExport={handleFilteredJSONExport}
+        exportType="json"
+      />
     </div>
   );
 }

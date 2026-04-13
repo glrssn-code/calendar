@@ -25,9 +25,17 @@ export function TimePicker({ value, onChange, className = '' }: TimePickerProps)
 
   const handleMinuteChange = (delta: number) => {
     let newMinute = minute + delta;
-    if (newMinute < 0) newMinute = 55;
-    if (newMinute > 55) newMinute = 0;
-    onChange(`${hour.toString().padStart(2, '0')}:${newMinute.toString().padStart(2, '0')}`);
+    let newHour = hour;
+    if (newMinute < 0) {
+      newMinute = 55;
+      newHour = hour - 1;
+      if (newHour < 8) newHour = 22;
+    } else if (newMinute > 55) {
+      newMinute = 0;
+      newHour = hour + 1;
+      if (newHour > 22) newHour = 8;
+    }
+    onChange(`${newHour.toString().padStart(2, '0')}:${newMinute.toString().padStart(2, '0')}`);
   };
 
   const handleWheel = (e: React.WheelEvent) => {

@@ -1,4 +1,4 @@
-import { addDays, addHours, setHours, setMinutes, format, parse, isValid } from 'date-fns';
+import { addDays, setHours, setMinutes, format, isValid } from 'date-fns';
 
 /**
  * 解析中文自然语言时间表达
@@ -7,6 +7,7 @@ import { addDays, addHours, setHours, setMinutes, format, parse, isValid } from 
  * - 具体日期 + 时间 (4月8日下午3点)
  * - 相对时间 (3天后, 两周后)
  * - 星期 + 时间 (下周三下午2点)
+ * - 中文数字 (三点, 下午三点)
  */
 
 interface ParsedResult {
@@ -39,6 +40,20 @@ const TIME_PATTERNS: { [key: string]: number } = {
   '晚上': 19,
   '夜里': 21,
 };
+
+// 中文数字映射
+const CHINESE_NUMBERS: { [key: string]: number } = {
+  '零': 0, '一': 1, '二': 2, '两': 2, '三': 3, '四': 4,
+  '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+};
+
+// 转换中文数字为阿拉伯数字
+function chineseToNumber(str: string): number | null {
+  if (CHINESE_NUMBERS[str] !== undefined) {
+    return CHINESE_NUMBERS[str];
+  }
+  return null;
+}
 
 // 星期映射
 const WEEKDAY_MAP: { [key: string]: number } = {
@@ -92,37 +107,34 @@ export function parseChineseDateTime(input: string): ParsedResult | null {
     }
   }
 
-  // 提取标题（去掉时间和提醒相关的词）
-  let remainingText = text;
-
   // 提取时间相关词汇并构建时间
   let targetHour = 9;
   let targetMinute = 0;
 
   // 处理 "明天下午两点" 这种格式
-  if (remainingText.includes('明天')) {
+  if (text.includes('明天')) {
     date = addDays(date, 1);
-    remainingText = remainingText.replace('明天', '');
+    text = text.replace('明天', '');
   }
 
-  if (remainingText.includes('后天')) {
+  if (text.includes('后天')) {
     date = addDays(date, 2);
-    remainingText = remainingText.replace('后天', '');
+    text = text.replace('后天', '');
   }
 
-  if (remainingText.includes('今天')) {
-    remainingText = remainingText.replace('今天', '');
+  if (text.includes('今天')) {
+    text = text.replace('今天', '');
   }
 
   // 处理下周的表达
-  if (remainingText.includes('下周')) {
+  if (text.includes('下周')) {
     date = addDays(date, 7);
-    remainingText = remainingText.replace('下周', '');
+    text = text.replace('下周', '');
   }
 
   // 处理星期几
   for (const [pattern, daysToAdd] of Object.entries(WEEKDAY_MAP)) {
-    if (remainingText.includes(pattern)) {
+    if (text.includes(pattern)) {
       if (daysToAdd >= 7) {
         // 下周的情况
         date = addDays(date, daysToAdd - 7 + 7);
@@ -134,7 +146,7 @@ export function parseChineseDateTime(input: string): ParsedResult | null {
         if (daysDiff <= 0) daysDiff += 7;
         date = addDays(date, daysDiff);
       }
-      remainingText = remainingText.replace(pattern, '');
+      text = text.replace(pattern, '');
       break;
     }
   }
@@ -165,22 +177,40 @@ export function parseChineseDateTime(input: string): ParsedResult | null {
     extractedText = extractedText.replace(timeMatch[0], '');
   }
 
-  // 处理 "X点" 格式
+  // 处理 "X点" 格式 (阿拉伯数字，如 14点, 3点)
   const hourMatch = extractedText.match(/(\d{1,2})\s*点/);
   if (hourMatch) {
-    targetHour = parseInt(hourMatch[1]);
-    // 如果是下午/晚上且小时小于12，加12
-    if (isAfternoon && targetHour < 12) {
-      targetHour += 12;
+    const extractedHour = parseInt(hourMatch[1]);
+    let finalHour = extractedHour;
+    if (isAfternoon && extractedHour < 12) {
+      finalHour = extractedHour + 12;
     }
-    if (isEvening && targetHour < 12) {
-      targetHour += 12;
+    if (isEvening && extractedHour < 12) {
+      finalHour = extractedHour + 12;
     }
+    targetHour = finalHour;
     extractedText = extractedText.replace(hourMatch[0], '');
     // 检查后面是否有半
     if (extractedText.includes('半')) {
       targetMinute = 30;
       extractedText = extractedText.replace('半', '');
+    }
+  } else {
+    // 尝试匹配中文数字 "三点" 等
+    for (const [chinese, num] of Object.entries(CHINESE_NUMBERS)) {
+      const chinesePattern = chinese + '点';
+      if (extractedText.includes(chinesePattern)) {
+        let finalHour = num;
+        if (isAfternoon && num < 12) {
+          finalHour = num + 12;
+        }
+        if (isEvening && num < 12) {
+          finalHour = num + 12;
+        }
+        targetHour = finalHour;
+        extractedText = extractedText.replace(chinesePattern, '');
+        break;
+      }
     }
   }
 
@@ -191,12 +221,9 @@ export function parseChineseDateTime(input: string): ParsedResult | null {
     extractedText = extractedText.replace(minMatch[0], '');
   }
 
-  // 用 extractedText 来提取标题（去除时间和提醒相关词）
-  remainingText = extractedText;
-
-  // 清理剩余文本作为标题
-  title = remainingText
-    .replace(/提醒我|通知我|记得|有个|有一个|,，/g, '')
+  // 清理剩余文本作为标题 - 先移除 "提醒" 相关词语和 "两点" 这样的时间表达
+  title = extractedText
+    .replace(/提醒我|通知我|提醒|记得|有个|有一个|两点|三点了|,，/g, '')
     .trim();
 
   // 如果标题为空，尝试提取"整理产品线报价清单"这种格式
@@ -238,15 +265,10 @@ export function parseChineseDateTime(input: string): ParsedResult | null {
   };
 }
 
-function remainingContent(pattern: string, text: string): string {
-  return text.split(pattern)[1] || '';
-}
-
 // 验证解析结果是否有效
 export function isValidParsedResult(result: ParsedResult | null): result is ParsedResult {
   if (!result) return false;
   if (!isValid(result.date)) return false;
-  // 不再检查时间是否已过，由 isPast 标志处理
   return true;
 }
 

@@ -7,7 +7,7 @@ export interface CalendarSettings {
   enableSound: boolean;
   enableDesktopNotifications: boolean;
   defaultView: 'day' | 'week' | 'month';
-  theme: 'skeuomorphic' | 'cartoon' | 'frosted';
+  theme: 'skeuomorphic' | 'cartoon' | 'frostedGlass';
 }
 
 const DEFAULT_SETTINGS: CalendarSettings = {
@@ -47,26 +47,10 @@ export function useSettings() {
     setSettings(updated);
   }, [settings]);
 
-  // 请求通知权限
-  const requestNotificationPermission = useCallback(async () => {
-    if (!('Notification' in window)) {
-      return false;
-    }
-    if (Notification.permission === 'granted') {
-      return true;
-    }
-    if (Notification.permission !== 'denied') {
-      const permission = await Notification.requestPermission();
-      return permission === 'granted';
-    }
-    return false;
-  }, []);
-
   return {
     settings,
     isLoaded,
     saveSettings,
-    requestNotificationPermission,
   };
 }
 

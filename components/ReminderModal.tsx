@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, addHours, addDays, isWeekend } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Bell, Clock, Calendar } from 'lucide-react';
+import { CalendarEvent } from '@/types/event';
 
 interface ReminderEvent {
   id: string;
@@ -18,12 +19,55 @@ interface ReminderModalProps {
   isOpen: boolean;
   event: ReminderEvent | null;
   onClose: () => void;
+  onMoveEvent?: (event: ReminderEvent, newDate: string, newStartTime: string, newEndTime: string) => void;
 }
 
-export function ReminderModal({ isOpen, event, onClose }: ReminderModalProps) {
+export function ReminderModal({ isOpen, event, onClose, onMoveEvent }: ReminderModalProps) {
   if (!event) return null;
 
   const eventDate = parseISO(`${event.date}T${event.startTime}`);
+
+  // 计算下一个工作日（跳过周末）
+  const getNextWorkday = (date: Date): Date => {
+    let nextDay = addDays(date, 1);
+    while (isWeekend(nextDay)) {
+      nextDay = addDays(nextDay, 1);
+    }
+    return nextDay;
+  };
+
+  const handleSnooze1Hour = () => {
+    if (onMoveEvent) {
+      // 计算新的时间（+1小时）
+      const [startH, startM] = event.startTime.split(':').map(Number);
+      const [endH, endM] = event.endTime.split(':').map(Number);
+
+      let newStartH = startH + 1;
+      let newEndH = endH + 1;
+
+      // 如果超过22点，限制在22点
+      if (newStartH > 22) newStartH = 22;
+      if (newEndH > 22) newEndH = 22;
+
+      const newStartTime = `${newStartH.toString().padStart(2, '0')}:${startM.toString().padStart(2, '0')}`;
+      const newEndTime = `${newEndH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
+
+      onMoveEvent(event, event.date, newStartTime, newEndTime);
+    }
+    onClose();
+  };
+
+  const handleSnoozeTomorrow = () => {
+    if (onMoveEvent) {
+      // 计算下一个工作日
+      const tomorrow = addDays(eventDate, 1);
+      const nextWorkday = getNextWorkday(tomorrow);
+      const newDate = format(nextWorkday, 'yyyy-MM-dd');
+
+      onMoveEvent(event, newDate, event.startTime, event.endTime);
+    }
+    onClose();
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -72,10 +116,25 @@ export function ReminderModal({ isOpen, event, onClose }: ReminderModalProps) {
           </p>
         </div>
 
-        <div className="flex justify-center pt-2">
+        {/* 操作按钮 */}
+        <div className="space-y-2 pt-2">
+          <Button
+            onClick={handleSnooze1Hour}
+            className="w-full bg-[#ff9500] hover:bg-[#ff9500]/90 text-white py-3 text-[15px] font-medium rounded-xl"
+          >
+            <Clock className="w-4 h-4 mr-2" />
+            推迟1小时提醒我
+          </Button>
+          <Button
+            onClick={handleSnoozeTomorrow}
+            className="w-full bg-[#5856d6] hover:bg-[#5856d6]/90 text-white py-3 text-[15px] font-medium rounded-xl"
+          >
+            <Calendar className="w-4 h-4 mr-2" />
+            明天相同时间提醒我
+          </Button>
           <Button
             onClick={onClose}
-            className="ios-button bg-[#007aff] hover:bg-[#007aff]/90 text-white px-10 py-2.5 text-[17px] font-medium"
+            className="w-full bg-[#007aff] hover:bg-[#007aff]/90 text-white py-4 text-[17px] font-semibold rounded-xl"
           >
             我知道了
           </Button>
@@ -89,6 +148,16 @@ export function ReminderModal({ isOpen, event, onClose }: ReminderModalProps) {
 export function GlobalReminderHandler() {
   const [reminderEvent, setReminderEvent] = useState<ReminderEvent | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [snoozedEvent, setSnoozedEvent] = useState<{ event: ReminderEvent; timeoutId: NodeJS.Timeout } | null>(null);
+
+  // 清除之前可能的snooze定时器
+  useEffect(() => {
+    return () => {
+      if (snoozedEvent) {
+        clearTimeout(snoozedEvent.timeoutId);
+      }
+    };
+  }, [snoozedEvent]);
 
   useEffect(() => {
     const handleReminder = (e: CustomEvent<{ event: ReminderEvent }>) => {
@@ -103,11 +172,24 @@ export function GlobalReminderHandler() {
     };
   }, []);
 
+  const handleMoveEvent = (event: ReminderEvent, newDate: string, newStartTime: string, newEndTime: string) => {
+    // 触发自定义事件，让日历更新事件
+    window.dispatchEvent(new CustomEvent('calendar-event-move', {
+      detail: {
+        eventId: event.id,
+        newDate,
+        newStartTime,
+        newEndTime,
+      }
+    }));
+  };
+
   return (
     <ReminderModal
       isOpen={isOpen}
       event={reminderEvent}
       onClose={() => setIsOpen(false)}
+      onMoveEvent={handleMoveEvent}
     />
   );
 }

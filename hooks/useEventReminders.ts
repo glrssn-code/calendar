@@ -52,8 +52,10 @@ export function useEventReminders() {
     setReminderState({ isActive: true, event });
   }, []);
 
-  const scheduleReminder = useCallback((event: CalendarEvent) => {
-    if (!event.reminderEnabled) return;
+  const scheduleReminder = useCallback((event: CalendarEvent, customDelayMs?: number) => {
+    // 已完成的事件不提醒
+    if (event.completed) return;
+    if (!event.reminderEnabled && customDelayMs === undefined) return;
 
     // 清除之前的同一个事件的定时器
     const existingTimeout = timeoutIdsRef.current.get(event.id);
@@ -62,11 +64,18 @@ export function useEventReminders() {
       timeoutIdsRef.current.delete(event.id);
     }
 
-    // 计算提醒时间
-    const eventTime = parseISO(`${event.date}T${event.startTime}`).getTime();
-    const reminderTime = eventTime - event.reminderMinutes * 60 * 1000;
-    const now = Date.now();
-    const delay = reminderTime - now;
+    let delay: number;
+
+    if (customDelayMs !== undefined) {
+      // 使用自定义延迟（用于推迟提醒）
+      delay = customDelayMs;
+    } else {
+      // 计算提醒时间
+      const eventTime = parseISO(`${event.date}T${event.startTime}`).getTime();
+      const reminderTime = eventTime - event.reminderMinutes * 60 * 1000;
+      const now = Date.now();
+      delay = reminderTime - now;
+    }
 
     if (delay <= 0) {
       // 已经到了提醒时间，立即提醒（但要等组件挂载后）

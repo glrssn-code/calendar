@@ -10,8 +10,9 @@ import {
 } from 'react';
 import { CalendarEvent, NewEvent, EventState, EventAction } from '@/types/event';
 import { parseISO } from 'date-fns';
-import { loadEvents, saveEvents, clearEvents } from '@/lib/storage';
+import { eventDB } from '@/lib/db';
 import { getSettings } from '@/hooks/useSettings';
+import { backupEventsToLocal, restoreEventsFromLocal } from '@/lib/autoBackup';
 
 function eventReducer(state: EventState, action: EventAction): EventState {
   switch (action.type) {
@@ -109,7 +110,6 @@ export function EventProvider({ children }: { children: ReactNode }) {
 
       // 播放声音
       if (settings.enableSound) {
-        // 使用 Web Audio API 播放提示音
         try {
           const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
           const oscillator = audioContext.createOscillator();
@@ -122,6 +122,8 @@ export function EventProvider({ children }: { children: ReactNode }) {
           gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
           oscillator.start(audioContext.currentTime);
           oscillator.stop(audioContext.currentTime + 0.5);
+          // 确保 AudioContext 被关闭，防止内存泄漏
+          setTimeout(() => audioContext.close(), 600);
         } catch (e) {
           console.warn('Failed to play notification sound:', e);
         }
@@ -141,54 +143,80 @@ export function EventProvider({ children }: { children: ReactNode }) {
     });
     scheduledReminders.clear();
 
-    // 为所有有提醒的事件设置定时器
+    // 为所有有提醒且未完成的事件设置定时器
     if (Notification.permission === 'granted') {
       state.events.forEach((event) => {
-        if (event.reminderEnabled) {
+        if (event.reminderEnabled && !event.completed) {
           scheduleReminder(event);
         }
       });
     }
   }, [state.events, scheduleReminder]);
 
+  // 加载事件
   useEffect(() => {
-    const events = loadEvents();
-    dispatch({ type: 'LOAD_EVENTS', payload: events });
+    const loadAndMigrate = async () => {
+      try {
+        // 先检查 IndexedDB 是否有数据
+        let events = await eventDB.getAll();
+
+        // 如果 IndexedDB 为空，检查 localStorage 自动备份
+        if (events.length === 0) {
+          const localEvents = restoreEventsFromLocal();
+          if (localEvents.length > 0) {
+            console.log('Found local backup, restoring to IndexedDB...');
+            for (const event of localEvents) {
+              await eventDB.add(event);
+            }
+            events = localEvents;
+          }
+        }
+
+        // 如果还是没有，检查旧版 localStorage 迁移
+        if (events.length === 0) {
+          const { migrateFromLocalStorage, hasLegacyData } = await import('@/lib/migrateFromLocalStorage');
+          if (hasLegacyData()) {
+            console.log('Found legacy data in localStorage, migrating...');
+            const result = await migrateFromLocalStorage();
+            if (result.success && !result.alreadyMigrated) {
+              console.log(`Migrated ${result.eventsMigrated} events and ${result.notesMigrated} notes from localStorage`);
+              // 重新加载数据
+              events = await eventDB.getAll();
+            }
+          }
+        }
+
+        // 备份到 localStorage
+        if (events.length > 0) {
+          backupEventsToLocal(events);
+        }
+
+        dispatch({ type: 'LOAD_EVENTS', payload: events });
+      } catch (err) {
+        console.error('Failed to load events:', err);
+        dispatch({ type: 'LOAD_EVENTS', payload: [] });
+      }
+    };
+
+    loadAndMigrate();
   }, []);
 
-  // 当事件加载完成后，重新调度提醒
+  // 统一调度提醒：只在事件列表、加载状态或权限变化时触发
   useEffect(() => {
-    if (!state.isLoading && state.events.length > 0) {
-      // 等待权限确认后再调度
-      if (Notification.permission === 'granted') {
-        rescheduleReminders();
-      }
+    if (!state.isLoading && state.events.length > 0 && Notification.permission === 'granted') {
+      rescheduleReminders();
     }
-  }, [state.isLoading]);
+  }, [state.events, state.isLoading, rescheduleReminders]);
 
-  // 监听权限变化
+  // 组件卸载时清除所有定时器
   useEffect(() => {
-    const handlePermissionChange = () => {
-      if (Notification.permission === 'granted') {
-        rescheduleReminders();
-      }
-    };
-
-    // 定期检查权限状态
-    const interval = setInterval(() => {
-      handlePermissionChange();
-    }, 1000);
-
     return () => {
-      clearInterval(interval);
+      scheduledReminders.forEach((timeoutId) => {
+        clearTimeout(timeoutId);
+      });
+      scheduledReminders.clear();
     };
-  }, [rescheduleReminders]);
-
-  useEffect(() => {
-    if (!state.isLoading) {
-      saveEvents(state.events);
-    }
-  }, [state.events, state.isLoading]);
+  }, []);
 
   const addEvent = useCallback((eventData: NewEvent): CalendarEvent => {
     const newEvent: CalendarEvent = {
@@ -196,13 +224,23 @@ export function EventProvider({ children }: { children: ReactNode }) {
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
     };
+    // 保存到 IndexedDB
+    eventDB.add(newEvent).catch(err => console.error('Failed to add event:', err));
     dispatch({ type: 'ADD_EVENT', payload: newEvent });
+    // 备份到 localStorage
+    const updatedEvents = [...state.events, newEvent];
+    backupEventsToLocal(updatedEvents);
     return newEvent;
-  }, []);
+  }, [state.events]);
 
   const updateEvent = useCallback((event: CalendarEvent) => {
+    // 更新 IndexedDB
+    eventDB.put(event).catch(err => console.error('Failed to update event:', err));
     dispatch({ type: 'UPDATE_EVENT', payload: event });
-  }, []);
+    // 备份到 localStorage
+    const updatedEvents = state.events.map(e => e.id === event.id ? event : e);
+    backupEventsToLocal(updatedEvents);
+  }, [state.events]);
 
   const deleteEvent = useCallback((id: string) => {
     // 清除该事件的定时器
@@ -211,8 +249,13 @@ export function EventProvider({ children }: { children: ReactNode }) {
       clearTimeout(timeoutId);
       scheduledReminders.delete(id);
     }
+    // 从 IndexedDB 删除
+    eventDB.delete(id).catch(err => console.error('Failed to delete event:', err));
     dispatch({ type: 'DELETE_EVENT', payload: id });
-  }, []);
+    // 备份到 localStorage
+    const updatedEvents = state.events.filter(e => e.id !== id);
+    backupEventsToLocal(updatedEvents);
+  }, [state.events]);
 
   const getEventsByDate = useCallback(
     (date: string) => {
