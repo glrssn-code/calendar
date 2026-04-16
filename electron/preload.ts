@@ -21,4 +21,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 获取备份目录路径
   getBackupPath: () => ipcRenderer.invoke('get-backup-path'),
+
+  // 手动备份到 save/auto 文件夹
+  manualBackupToSave: (content: string) =>
+    ipcRenderer.invoke('manual-backup-to-save', content),
+
+  // 设置每日自动备份
+  setupDailyAutoBackup: () =>
+    ipcRenderer.invoke('setup-daily-auto-backup'),
 });

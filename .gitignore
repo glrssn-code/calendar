@@ -53,6 +53,11 @@ calendar-portable/
 *.zip
 
 # Compiled Electron TypeScript (we track the source files)
-electron/*.ts
-!electron/main.ts
-!electron/preload.ts
+electron/*.js
+electron/*.js.map
+
+# Calendar EXE version
+calendar/
+
+# Calendar public version (web build)
+calendar-public-version/

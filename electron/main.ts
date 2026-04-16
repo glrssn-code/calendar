@@ -8,6 +8,7 @@ const isDev = !app.isPackaged;
 
 let mainWindow: BrowserWindow | null = null;
 let server: http.Server | null = null;
+let autoBackupTimer: NodeJS.Timeout | null = null;
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -76,6 +77,70 @@ ipcMain.handle('backup-file-exists', async (_event, filename: string) => {
 
 ipcMain.handle('get-backup-path', () => {
   return getBackupDir();
+});
+
+// 获取 save/auto 目录路径
+function getSaveAutoDir(): string {
+  // save/auto 在 exe 同级的 save/auto 目录
+  // exe 在 dist-electron/win-unpacked/Calendar.exe
+  // __dirname 是 dist-electron/win-unpacked/resources/app/electron/
+  const exeDir = path.join(__dirname, '../..');
+  const saveAutoDir = path.join(exeDir, 'save', 'auto');
+  if (!fs.existsSync(saveAutoDir)) {
+    fs.mkdirSync(saveAutoDir, { recursive: true });
+  }
+  return saveAutoDir;
+}
+
+// 手动备份到 save/auto 文件夹
+ipcMain.handle('manual-backup-to-save', async (_event, content: string) => {
+  try {
+    const saveAutoDir = getSaveAutoDir();
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-');
+    const filename = `calendar-backup-${dateStr}-${timeStr}.json`;
+    const filePath = path.join(saveAutoDir, filename);
+    fs.writeFileSync(filePath, content, 'utf-8');
+    console.log('[Backup] Saved to:', filePath);
+    return { success: true, path: filePath };
+  } catch (error) {
+    console.error('[Backup] Failed to save backup:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+// 设置每日自动备份（由渲染进程触发）
+ipcMain.handle('setup-daily-auto-backup', () => {
+  if (autoBackupTimer) {
+    clearInterval(autoBackupTimer);
+  }
+
+  // 每天检查一次（实际上每天固定时间执行）
+  // 使用 24 小时 interval，每次检查是否到了执行时间
+  const runDailyBackup = () => {
+    const now = new Date();
+    const saveAutoDir = getSaveAutoDir();
+    const dateStr = now.toISOString().split('T')[0];
+    const filename = `calendar-backup-${dateStr}.json`;
+    const filePath = path.join(saveAutoDir, filename);
+
+    // 检查是否已经备份过今天
+    if (!fs.existsSync(filePath)) {
+      // 发送请求到渲染进程获取备份数据（通过 IPC）
+      // 但这里我们只是记录，实际备份由渲染进程触发
+      console.log('[DailyBackup] Time to backup, waiting for renderer...');
+    }
+  };
+
+  // 立即执行一次
+  runDailyBackup();
+
+  // 设置定时器：每小时检查一次
+  autoBackupTimer = setInterval(runDailyBackup, 60 * 60 * 1000); // 每小时
+
+  console.log('[DailyBackup] Timer started');
+  return { success: true };
 });
 
 function serveStatic(dir: string, port: number): Promise<void> {

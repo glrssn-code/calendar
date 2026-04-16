@@ -11,13 +11,15 @@ import { DayView } from '@/components/calendar/DayView';
 import { MonthView } from '@/components/calendar/MonthView';
 import { EventModal } from '@/components/events/EventModal';
 import { CalendarEvent } from '@/types/event';
-import { Settings, Plus, ChevronLeft, ChevronRight, StickyNote, HelpCircle } from 'lucide-react';
+import { Settings, Plus, ChevronLeft, ChevronRight, StickyNote, HelpCircle, Download } from 'lucide-react';
 import { GlobalReminderHandler } from '@/components/ReminderModal';
 import { useEventFilter } from '@/hooks/useEventFilter';
 import { useSettings } from '@/hooks/useSettings';
 import { StickyNotePanel } from '@/components/stickyNote/StickyNotePanel';
 import { StickyNoteModal } from '@/components/stickyNote/StickyNoteModal';
 import { HelpModal } from '@/components/HelpModal';
+import { createBackup, downloadBackup, generateBackupFilename } from '@/lib/backup';
+import { toast } from 'sonner';
 
 type ViewType = 'day' | 'week' | 'month';
 
@@ -116,6 +118,36 @@ function HomeContent() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isStickyNoteModalOpen, setIsStickyNoteModalOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+
+  // 检查是否是 Electron 环境
+  const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
+
+  // 处理备份按钮点击
+  const handleBackup = async () => {
+    try {
+      const data = await createBackup();
+
+      if (isElectron) {
+        // EXE 版：保存到本地文件夹
+        const content = JSON.stringify(data);
+        const result = await (window as any).electronAPI.manualBackupToSave(content);
+        if (result.success) {
+          toast.success('已备份到本地文件夹');
+          // 设置每日自动备份
+          await (window as any).electronAPI.setupDailyAutoBackup();
+        } else {
+          toast.error('备份失败：' + result.error);
+        }
+      } else {
+        // 网页版：下载备份文件
+        downloadBackup(data, generateBackupFilename());
+        toast.success('备份文件已下载');
+      }
+    } catch (error) {
+      console.error('Backup error:', error);
+      toast.error('备份失败');
+    }
+  };
 
   const theme = themes[settings.theme as ThemeKey] || themes.skeuomorphic;
 
@@ -352,6 +384,15 @@ function HomeContent() {
           <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
           </svg>
+        </button>
+
+        {/* 备份按钮 */}
+        <button
+          onClick={handleBackup}
+          className={`h-7 w-7 flex items-center justify-center rounded-lg shadow-sm border transition-all ${theme.navBtn}`}
+          title={isElectron ? '备份到本地文件夹' : '下载备份文件'}
+        >
+          <Download className={`w-3.5 h-3.5 ${theme.navBtnText}`} />
         </button>
 
         {/* 帮助按钮 */}

@@ -36,6 +36,13 @@ export function StickyNotePanel({ onCreateEvent, filteredNotes, searchQuery }: S
   const [newNoteColor, setNewNoteColor] = useState<EventColor>('blue');
   const [newNoteCompleted, setNewNoteCompleted] = useState(false);
 
+  // 搜索时自动展开面板
+  useEffect(() => {
+    if (searchQuery && searchQuery.trim() !== '') {
+      setIsExpanded(true);
+    }
+  }, [searchQuery]);
+
   // 拖拽排序相关状态
   const [isReordering, setIsReordering] = useState(false);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -55,10 +62,21 @@ export function StickyNotePanel({ onCreateEvent, filteredNotes, searchQuery }: S
   // 当前编辑的便签ID
   const [editingNote, setEditingNote] = useState<StickyNote | null>(null);
 
-  // 搜索模式下使用过滤后的便签，否则使用全部便签
+  // 搜索模式下使用过滤后的便签，否则使用全部便签，并按完成状态排序（未完成在前，已完成在后）
+  const sortedNotes = (notesToSort: StickyNote[]) => {
+    return [...notesToSort].sort((a, b) => {
+      // 未完成的在前，已完成的在后
+      if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1;
+      }
+      // 同状态时按 order 排序
+      return a.order - b.order;
+    });
+  };
+
   const displayNotes = searchQuery && filteredNotes !== undefined
-    ? (filteredNotes.length > 0 ? filteredNotes : notes)
-    : notes;
+    ? (filteredNotes.length > 0 ? sortedNotes(filteredNotes) : notes)
+    : sortedNotes(notes);
 
   const handleToggle = () => {
     setIsExpanded(!isExpanded);
