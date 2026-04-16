@@ -4,11 +4,25 @@ import { exportEventsToJSON } from './storage';
 
 /**
  * 导出事件为 JSON 文件（简化格式）
- * 格式：类别：标题（每个事件一行）
+ * 格式：按类别分组，每个类别显示标题列表
  */
 export function downloadAsJSON(events: CalendarEvent[], filename: string = 'calendar-events.json'): void {
-  // 按类别分组并生成简化文本
-  const lines = events.map(event => `${event.category}：${event.title}`);
+  // 按类别分组
+  const grouped = events.reduce((acc, event) => {
+    if (!acc[event.category]) {
+      acc[event.category] = [];
+    }
+    acc[event.category].push(event.title);
+    return acc;
+  }, {} as Record<string, string[]>);
+
+  // 生成文本
+  const lines: string[] = [];
+  for (const [category, titles] of Object.entries(grouped)) {
+    lines.push(`${category}：`);
+    titles.forEach(title => lines.push(title));
+  }
+
   const content = lines.join('\n');
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
   downloadBlob(blob, filename);

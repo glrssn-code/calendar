@@ -328,105 +328,6 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Notification Settings */}
-        <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-emerald-50 to-teal-50">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-100 rounded-lg">
-                <Bell className="w-5 h-5 text-emerald-600" />
-              </div>
-              <h2 className="text-lg font-semibold text-slate-800">通知设置</h2>
-            </div>
-          </div>
-          <div className="p-6 space-y-6">
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
-              <div className="space-y-0.5">
-                <Label className="text-slate-700 font-medium">声音提醒</Label>
-                <p className="text-sm text-slate-500">事件提醒时播放声音</p>
-              </div>
-              <Switch
-                checked={settings.enableSound}
-                onCheckedChange={(v) => saveSettings({ enableSound: v })}
-                className="data-[checked]:bg-emerald-500"
-              />
-            </div>
-
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
-              <div className="space-y-0.5">
-                <Label className="text-slate-700 font-medium">桌面通知</Label>
-                <p className="text-sm text-slate-500">在桌面显示事件通知</p>
-              </div>
-              <Switch
-                checked={settings.enableDesktopNotifications}
-                onCheckedChange={(v) => saveSettings({ enableDesktopNotifications: v })}
-                className="data-[checked]:bg-emerald-500"
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* Appearance Settings */}
-        <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-purple-50 to-pink-50">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Palette className="w-5 h-5 text-purple-600" />
-              </div>
-              <h2 className="text-lg font-semibold text-slate-800">外观设置</h2>
-            </div>
-          </div>
-          <div className="p-6 space-y-6">
-            <div className="space-y-3">
-              <Label className="text-slate-700 font-medium">主题风格</Label>
-              <div className="grid grid-cols-3 gap-4">
-                {[
-                  {
-                    value: 'skeuomorphic',
-                    bgGradient: 'from-slate-100 to-slate-200',
-                    borderColor: 'border-slate-300',
-                    label: '拟物主题',
-                    desc: '渐变阴影立体感',
-                    preview: '🎨'
-                  },
-                  {
-                    value: 'cartoon',
-                    bgGradient: 'from-pink-100 to-purple-100',
-                    borderColor: 'border-pink-300',
-                    label: '卡通主题',
-                    desc: '圆润可爱色彩丰富',
-                    preview: '🌈'
-                  },
-                  {
-                    value: 'frostedGlass',
-                    bgGradient: 'from-blue-100/50 to-purple-100/50',
-                    borderColor: 'border-blue-200',
-                    label: '毛玻璃',
-                    desc: '玻璃质感现代科技',
-                    preview: '✨'
-                  },
-                ].map((theme) => (
-                  <button
-                    key={theme.value}
-                    onClick={() => saveSettings({ theme: theme.value as 'skeuomorphic' | 'cartoon' | 'frostedGlass' })}
-                    className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
-                      settings.theme === theme.value
-                        ? 'border-blue-500 bg-blue-50 shadow-lg scale-105'
-                        : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
-                    }`}
-                  >
-                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${theme.bgGradient} ${theme.borderColor} border-2 flex items-center justify-center text-3xl shadow-sm`}>
-                      {theme.preview}
-                    </div>
-                    <span className="text-sm font-semibold text-slate-700">{theme.label}</span>
-                    <span className="text-xs text-slate-500">{theme.desc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Data Management Section */}
         <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-cyan-50 to-blue-50">
             <div className="flex items-center gap-3">
@@ -581,6 +482,105 @@ export default function SettingsPage() {
             )}
           </div>
         </section>
+        {/* Notification Settings */}
+        <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-emerald-50 to-teal-50">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <Bell className="w-5 h-5 text-emerald-600" />
+              </div>
+              <h2 className="text-lg font-semibold text-slate-800">通知设置</h2>
+            </div>
+          </div>
+          <div className="p-6 space-y-6">
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+              <div className="space-y-0.5">
+                <Label className="text-slate-700 font-medium">声音提醒</Label>
+                <p className="text-sm text-slate-500">事件提醒时播放声音</p>
+              </div>
+              <Switch
+                checked={settings.enableSound}
+                onCheckedChange={(v) => saveSettings({ enableSound: v })}
+                className="data-[checked]:bg-emerald-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+              <div className="space-y-0.5">
+                <Label className="text-slate-700 font-medium">桌面通知</Label>
+                <p className="text-sm text-slate-500">在桌面显示事件通知</p>
+              </div>
+              <Switch
+                checked={settings.enableDesktopNotifications}
+                onCheckedChange={(v) => saveSettings({ enableDesktopNotifications: v })}
+                className="data-[checked]:bg-emerald-500"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Appearance Settings */}
+        <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-purple-50 to-pink-50">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Palette className="w-5 h-5 text-purple-600" />
+              </div>
+              <h2 className="text-lg font-semibold text-slate-800">外观设置</h2>
+            </div>
+          </div>
+          <div className="p-6 space-y-6">
+            <div className="space-y-3">
+              <Label className="text-slate-700 font-medium">主题风格</Label>
+              <div className="grid grid-cols-3 gap-4">
+                {[
+                  {
+                    value: 'skeuomorphic',
+                    bgGradient: 'from-slate-100 to-slate-200',
+                    borderColor: 'border-slate-300',
+                    label: '拟物主题',
+                    desc: '渐变阴影立体感',
+                    preview: '🎨'
+                  },
+                  {
+                    value: 'cartoon',
+                    bgGradient: 'from-pink-100 to-purple-100',
+                    borderColor: 'border-pink-300',
+                    label: '卡通主题',
+                    desc: '圆润可爱色彩丰富',
+                    preview: '🌈'
+                  },
+                  {
+                    value: 'frostedGlass',
+                    bgGradient: 'from-blue-100/50 to-purple-100/50',
+                    borderColor: 'border-blue-200',
+                    label: '毛玻璃',
+                    desc: '玻璃质感现代科技',
+                    preview: '✨'
+                  },
+                ].map((theme) => (
+                  <button
+                    key={theme.value}
+                    onClick={() => saveSettings({ theme: theme.value as 'skeuomorphic' | 'cartoon' | 'frostedGlass' })}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
+                      settings.theme === theme.value
+                        ? 'border-blue-500 bg-blue-50 shadow-lg scale-105'
+                        : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+                    }`}
+                  >
+                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${theme.bgGradient} ${theme.borderColor} border-2 flex items-center justify-center text-3xl shadow-sm`}>
+                      {theme.preview}
+                    </div>
+                    <span className="text-sm font-semibold text-slate-700">{theme.label}</span>
+                    <span className="text-xs text-slate-500">{theme.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Data Management Section */}
 
         {/* About Section */}
         <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">

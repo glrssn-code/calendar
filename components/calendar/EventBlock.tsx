@@ -131,7 +131,7 @@ export function EventBlock({ event, onClick, height, theme = 'skeuomorphic', onD
           }
           onToggleComplete?.(event);
         }}
-        onMouseEnter={(e) => {
+        onMouseEnter={() => {
           setShowTooltip(true);
           if (buttonRef.current) {
             const rect = buttonRef.current.getBoundingClientRect();
@@ -169,18 +169,21 @@ export function EventBlock({ event, onClick, height, theme = 'skeuomorphic', onD
             />
           </>
         )}
-        {/* 标题 */}
-        <div
-          ref={titleRef}
-          className={`font-semibold text-[13px] leading-tight text-center px-1 w-full max-w-full ${isShortEvent ? 'whitespace-nowrap truncate' : 'whitespace-pre-wrap'} ${isFrostedGlass ? 'text-slate-900' : 'text-white'} ${event.completed ? 'line-through opacity-70' : ''}`}
-          style={{ wordBreak: isShortEvent ? 'normal' : 'break-all' }}
-        >{event.title}</div>
-        {/* 分类 */}
-        {!isShortEvent && !isNoCategoryEvent && (
-          <div className={`text-[11px] leading-tight text-center px-1 w-full ${isFrostedGlass ? 'text-slate-700' : 'opacity-90'} ${event.completed ? 'line-through opacity-70' : ''}`}>
-            {event.category}
-          </div>
-        )}
+        {/* 内容容器 - 整体垂直居中 */}
+        <div className="flex flex-col justify-center w-full h-full">
+          {/* 标题 */}
+          <div
+            ref={titleRef}
+            className={`font-semibold text-[13px] leading-tight text-center px-1 w-full max-w-full ${isShortEvent ? 'whitespace-nowrap truncate' : 'whitespace-pre-wrap'} ${isFrostedGlass ? 'text-slate-900' : 'text-white'} ${event.completed ? 'line-through opacity-70' : ''}`}
+            style={{ wordBreak: isShortEvent ? 'normal' : 'break-all' }}
+          >{event.title}</div>
+          {/* 分类 */}
+          {!isShortEvent && !isNoCategoryEvent && (
+            <div className={`text-[11px] leading-tight text-center px-1 w-full ${isFrostedGlass ? 'text-slate-700' : 'opacity-90'} ${event.completed ? 'line-through opacity-70' : ''}`}>
+              {event.category}
+            </div>
+          )}
+        </div>
         {event.isUrgent && (
           <div className={`absolute top-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-bold backdrop-blur-sm ${isFrostedGlass ? 'bg-white/50 text-red-600' : 'bg-white/30 text-white'}`}>
             紧急

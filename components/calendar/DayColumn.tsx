@@ -216,6 +216,7 @@ export function DayColumn({
     e.stopPropagation();
 
     const noteData = e.dataTransfer.getData('text/plain');
+    console.log('[DayColumn dragover] noteData:', noteData ? 'has data' : 'EMPTY');
 
     // 即使没有数据也要阻止默认行为，允许拖拽
     if (!noteData) {
@@ -284,7 +285,7 @@ export function DayColumn({
     e.preventDefault();
     e.stopPropagation();
 
-    console.log('[DayColumn drop] fired, date:', format(date, 'yyyy-MM-dd'));
+    console.log('[DayColumn drop] fired, date:', format(date, 'yyyy-MM-dd'), 'ref:', stickyNoteDragRef.current ? 'has note' : 'EMPTY');
 
     // 优先使用 ref 中的数据（dragover 已更新）
     const note = stickyNoteDragRef.current;

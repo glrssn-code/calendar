@@ -224,7 +224,8 @@ export function WeeklyCalendar({
     setDragPreview(null);
     setDragHint(null);
     setIsDragging(false);
-  }, [draggingEvent, dragPreview, updateEvent, HOUR_HEIGHT]);
+    dragMovedRef.current = false;
+  }, [draggingEvent, dragPreview, updateEvent, HOUR_HEIGHT, dragMovedRef]);
 
   // document 级别的拖动结束处理
   useEffect(() => {
