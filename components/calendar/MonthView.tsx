@@ -166,7 +166,7 @@ export function MonthView({
                         onEventClick(event);
                       }}
                     >
-                      {event.isAllDay ? event.title : `${event.startTime?.slice(0, 5) || ''} ${event.title}`}
+                      {event.startTime ? `${event.startTime.slice(0, 5)} ` : ''}{event.title}
                     </div>
                   ))}
                   {dayEvents.length > 3 && (

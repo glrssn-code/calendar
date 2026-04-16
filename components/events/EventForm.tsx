@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import { TimePicker } from '@/components/ui/time-picker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { CalendarEvent, EventColor, NewEvent, CATEGORY_OPTIONS, CATEGORY_COLORS } from '@/types/event';
+import { CalendarEvent, EventColor, NewEvent, CATEGORY_OPTIONS, CATEGORY_COLORS, RepeatType } from '@/types/event';
 import { parseChineseDateTime, formatParsedResult, isValidParsedResult } from '@/lib/nlpParser';
 import { Sparkles, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 import { COLOR_CATEGORY_MAP } from '@/lib/constants';
@@ -38,6 +38,13 @@ const REMINDER_OPTIONS = [
   { value: 15, label: '15 分钟前' },
   { value: 30, label: '30 分钟前' },
   { value: 60, label: '1 小时前' },
+];
+
+const REPEAT_OPTIONS = [
+  { value: 'daily', label: '每日' },
+  { value: 'weekly', label: '每周' },
+  { value: 'monthly', label: '每月' },
+  { value: 'yearly', label: '每年' },
 ];
 
 // 生成时间选项：08:00 - 22:00，每30分钟一格
@@ -108,7 +115,8 @@ export function EventForm({
   );
   const [category, setCategory] = useState<string>(initialEvent?.category || '售前');
   const [isUrgent, setIsUrgent] = useState(initialEvent?.isUrgent || false);
-  const [isAllDay, setIsAllDay] = useState(initialEvent?.isAllDay || false);
+  const [repeatType, setRepeatType] = useState<RepeatType>(initialEvent?.repeatType || 'none');
+  const [repeatEndDate, setRepeatEndDate] = useState(initialEvent?.repeatEndDate || '');
 
   // 比较两个时间，返回 -1 (t1<t2), 0 (t1==t2), 1 (t1>t2)
   const compareTimes = (t1: string, t2: string): number => {
@@ -219,6 +227,7 @@ export function EventForm({
       category: smartCategory,
       color: result.isUrgent ? 'blue' : CATEGORY_COLORS[smartCategory],
       completed: false,
+      repeatType: 'none',
     };
 
     // 如果时间已过，显示确认对话框
@@ -260,8 +269,8 @@ export function EventForm({
       return;
     }
 
-    // 全天待办不需要时间
-    if (!isAllDay && (!startTime || !endTime)) {
+    // 事件需要时间
+    if (!startTime || !endTime) {
       return;
     }
 
@@ -272,33 +281,38 @@ export function EventForm({
         title: title.trim(),
         description: description.trim(),
         date,
-        startTime: isAllDay ? undefined : startTime,
-        endTime: isAllDay ? undefined : endTime,
-        reminderEnabled: isAllDay ? false : reminderEnabled,
+        startTime,
+        endTime,
+        reminderEnabled,
         reminderMinutes,
         isUrgent,
         category,
         color: isUrgent ? 'blue' : CATEGORY_COLORS[category],
         completed: initialEvent.completed,
-        isAllDay,
+        repeatType,
+        repeatEndDate: repeatType !== 'none' ? repeatEndDate : undefined,
+        repeatId: initialEvent.repeatId,
         createdAt: initialEvent.createdAt,
       };
       onSubmit(eventData);
     } else {
       // Creating new event - no id or createdAt
+      const repeatId = repeatType !== 'none' ? crypto.randomUUID() : undefined;
       const eventData: NewEvent = {
         title: title.trim(),
         description: description.trim(),
         date,
-        startTime: isAllDay ? undefined : startTime,
-        endTime: isAllDay ? undefined : endTime,
-        reminderEnabled: isAllDay ? false : reminderEnabled,
+        startTime,
+        endTime,
+        reminderEnabled,
         reminderMinutes,
         isUrgent,
         category,
         color: isUrgent ? 'blue' : CATEGORY_COLORS[category],
         completed: false,
-        isAllDay,
+        repeatType,
+        repeatEndDate: repeatType !== 'none' ? repeatEndDate : undefined,
+        repeatId,
       };
       onSubmit(eventData);
     }
@@ -447,19 +461,17 @@ export function EventForm({
             />
           </div>
 
-          {/* 提醒 + 紧急事件 + 全天 放一行 */}
+          {/* 提醒 + 紧急事件 + 重复 放一行 */}
           <div className="grid grid-cols-3 gap-2">
-            {!isAllDay && (
-              <div className="flex items-center justify-between py-2 px-2 bg-slate-50 rounded-lg">
-                <Label htmlFor="reminder" className="text-slate-700 font-medium text-xs">提醒</Label>
-                <Switch
-                  id="reminder"
-                  checked={reminderEnabled}
-                  onCheckedChange={setReminderEnabled}
-                  className="data-[checked]:bg-blue-500 scale-90"
-                />
-              </div>
-            )}
+            <div className="flex items-center justify-between py-2 px-2 bg-slate-50 rounded-lg">
+              <Label htmlFor="reminder" className="text-slate-700 font-medium text-xs">提醒</Label>
+              <Switch
+                id="reminder"
+                checked={reminderEnabled}
+                onCheckedChange={setReminderEnabled}
+                className="data-[checked]:bg-blue-500 scale-90"
+              />
+            </div>
 
             <div className="flex items-center justify-between py-2 px-2 bg-slate-50 rounded-lg">
               <Label className="text-slate-700 font-medium text-xs">紧急</Label>
@@ -471,36 +483,66 @@ export function EventForm({
             </div>
 
             <div className="flex items-center justify-between py-2 px-2 bg-slate-50 rounded-lg">
-              <Label htmlFor="allDay" className="text-slate-700 font-medium text-xs">全天</Label>
+              <Label htmlFor="repeat" className="text-slate-700 font-medium text-xs">重复</Label>
               <Switch
-                id="allDay"
-                checked={isAllDay}
-                onCheckedChange={(checked) => {
-                  setIsAllDay(checked);
-                  if (checked) setReminderEnabled(false);
-                }}
+                id="repeat"
+                checked={repeatType !== 'none'}
+                onCheckedChange={(checked) => setRepeatType(checked ? 'daily' : 'none')}
                 className="data-[checked]:bg-blue-500 scale-90"
               />
             </div>
           </div>
 
-          {/* 时间选择 - 全天待办时隐藏 */}
-          {!isAllDay && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-slate-700 font-medium text-xs">开始时间</Label>
-                <TimePicker value={startTime} onChange={handleStartTimeChange} />
+          {/* 重复选项 */}
+          {repeatType !== 'none' && (
+            <div className="space-y-2 p-3 bg-slate-50 rounded-lg">
+              <div className="space-y-1.5">
+                <Label className="text-slate-700 font-medium text-xs">重复频率</Label>
+                <Select
+                  value={repeatType}
+                  onValueChange={(v) => setRepeatType(v as RepeatType)}
+                >
+                  <SelectTrigger className="border-slate-200 focus:border-blue-400 h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {REPEAT_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-
-              <div className="space-y-1">
-                <Label className="text-slate-700 font-medium text-xs">结束时间</Label>
-                <TimePicker value={endTime} onChange={handleEndTimeChange} />
+              <div className="space-y-1.5">
+                <Label htmlFor="repeatEndDate" className="text-slate-700 font-medium text-xs">重复结束日期</Label>
+                <Input
+                  id="repeatEndDate"
+                  type="date"
+                  value={repeatEndDate}
+                  onChange={(e) => setRepeatEndDate(e.target.value)}
+                  placeholder="留空表示永不结束"
+                  className="border-slate-200 focus:border-blue-400 h-8 text-sm"
+                />
               </div>
             </div>
           )}
 
+          {/* 时间选择 */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-slate-700 font-medium text-xs">开始时间</Label>
+              <TimePicker value={startTime} onChange={handleStartTimeChange} />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-slate-700 font-medium text-xs">结束时间</Label>
+              <TimePicker value={endTime} onChange={handleEndTimeChange} />
+            </div>
+          </div>
+
           {/* 提醒时间 - 如果开启 */}
-          {reminderEnabled && !isAllDay && (
+          {reminderEnabled && (
             <div className="space-y-1.5">
               <Label className="text-slate-700 font-medium text-xs">提前提醒时间</Label>
               <Select

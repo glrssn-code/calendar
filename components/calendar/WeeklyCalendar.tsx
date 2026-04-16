@@ -88,7 +88,7 @@ export function WeeklyCalendar({
   // 拖动开始
   const handleDragStart = useCallback((event: CalendarEvent, e: React.MouseEvent, date: Date) => {
     const scroll = scrollRef.current;
-    if (!scroll || event.isAllDay || !event.startTime) return;
+    if (!scroll || !event.startTime) return;
 
     const scrollTop = scroll.scrollTop;
     const [startH, startM] = event.startTime.split(':').map(Number);
@@ -343,7 +343,7 @@ export function WeeklyCalendar({
         category,
         color: note.color,
         completed: note.completed, // 使用便签的完成状态
-        isAllDay: false,
+        repeatType: 'none',
         sourceNoteId: note.id, // 链接到便签
       });
 
@@ -454,17 +454,17 @@ export function WeeklyCalendar({
         })}
       </div>
 
-      {/* 全天待办区域 */}
+      {/* 重复事件区域 */}
       {useMemo(() => {
-        const weekAllDayEvents = weekDays.flatMap(day => {
+        const weekRepeatEvents = weekDays.flatMap(day => {
           const dateKey = format(day, 'yyyy-MM-dd');
           const dayEvents = filteredEventIds
             ? getEventsByDate(dateKey).filter(e => filteredEventIds.has(e.id))
             : getEventsByDate(dateKey);
-          return dayEvents.filter(e => e.isAllDay);
+          return dayEvents.filter(e => e.repeatType !== 'none');
         });
 
-        if (weekAllDayEvents.length === 0) return null;
+        if (weekRepeatEvents.length === 0) return null;
 
         return (
           <div className={`flex border-b ${
@@ -480,11 +480,11 @@ export function WeeklyCalendar({
               <div className="h-full flex items-center justify-center">
                 <span className={`text-xs font-medium ${
                   settings.theme === 'frostedGlass' ? 'text-white/80' : 'text-slate-500'
-                }`}>全天</span>
+                }`}>重复</span>
               </div>
             </div>
             <div className="flex-1 flex gap-1 px-1 py-1 overflow-x-auto">
-              {weekAllDayEvents.map((event) => (
+              {weekRepeatEvents.map((event) => (
                 <div
                   key={event.id}
                   className={`flex-shrink-0 px-2 py-0.5 rounded text-xs text-white cursor-pointer hover:opacity-80 transition-opacity backdrop-blur ${

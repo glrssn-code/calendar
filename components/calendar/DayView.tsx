@@ -37,17 +37,17 @@ export function DayView({
     ? events.filter(e => filteredEventIds.has(e.id))
     : events;
 
-  // 按时间分组事件（排除全天待办）
+  // 按时间分组事件
   const getEventsAtHour = (hour: number) => {
     return filteredEvents.filter(event => {
-      if (event.isAllDay || !event.startTime) return false;
+      if (!event.startTime) return false;
       const eventHour = parseInt(event.startTime.split(':')[0]);
       return eventHour === hour;
     });
   };
 
-  // 全天待办事件
-  const allDayEvents = filteredEvents.filter(event => event.isAllDay);
+  // 重复事件
+  const repeatEvents = filteredEvents.filter(event => event.repeatType !== 'none');
 
   // 当前时间红线位置
   const now = new Date();
@@ -94,12 +94,12 @@ export function DayView({
         </div>
       </div>
 
-      {/* 全天待办区域 */}
-      {allDayEvents.length > 0 && (
+      {/* 重复事件区域 */}
+      {repeatEvents.length > 0 && (
         <div className="border-b border-slate-200 bg-slate-50 px-2 py-2">
-          <div className="text-xs text-slate-500 mb-1 font-medium">全天待办</div>
+          <div className="text-xs text-slate-500 mb-1 font-medium">重复事件</div>
           <div className="flex flex-wrap gap-1">
-            {allDayEvents.map((event) => (
+            {repeatEvents.map((event) => (
               <div
                 key={event.id}
                 className={`px-2 py-1 rounded text-xs text-white cursor-pointer hover:opacity-80 transition-opacity ${
@@ -166,7 +166,7 @@ export function DayView({
 
               {/* 事件层 */}
               <div className="absolute inset-0 pointer-events-none">
-                {filteredEvents.filter(e => !e.isAllDay && e.startTime && e.endTime).map((event) => {
+                {filteredEvents.filter(e => e.startTime && e.endTime).map((event) => {
                   const [startH, startM] = event.startTime!.split(':').map(Number);
                   const [endH, endM] = event.endTime!.split(':').map(Number);
                   const startMinutes = (startH - 8) * 60 + startM;

@@ -52,8 +52,8 @@ function calculateEventLayout(events: CalendarEvent[]): Map<string, { col: numbe
 
   if (events.length === 0) return layout;
 
-  // 过滤掉全天事件并排序
-  const timedEvents = events.filter(e => !e.isAllDay && e.startTime && e.endTime);
+  // 过滤并排序
+  const timedEvents = events.filter(e => e.startTime && e.endTime);
   if (timedEvents.length === 0) return layout;
 
   const sorted = [...timedEvents].sort((a, b) => {
@@ -179,7 +179,7 @@ export function DayColumn({
   // 检查某时间点是否有事件
   const slotHasEvent = (hour: number) => {
     return events.some(event => {
-      if (event.isAllDay || !event.startTime || !event.endTime) return false;
+      if (!event.startTime || !event.endTime) return false;
       const [startH] = event.startTime.split(':').map(Number);
       const [endH] = event.endTime.split(':').map(Number);
       return hour >= startH && hour < endH;
@@ -395,7 +395,7 @@ export function DayColumn({
           style={{ height: `${15 * HOUR_HEIGHT}px` }}
         >
           {(() => {
-            const timedEvents = events.filter(e => !e.isAllDay && e.startTime && e.endTime);
+            const timedEvents = events.filter(e => e.startTime && e.endTime);
             const layout = useMemo(() => calculateEventLayout(timedEvents), [timedEvents]);
             const MIN_HEIGHT = HOUR_HEIGHT / 2;
 
