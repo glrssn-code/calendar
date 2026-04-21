@@ -202,7 +202,7 @@ export function EventModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent onClose={onClose} key={isOpen ? 'dialog-open' : 'dialog-closed'} className="sm:max-w-[400px] ios-dialog p-4 max-h-[90vh] overflow-y-auto">
+        <DialogContent key={isOpen ? 'dialog-open' : 'dialog-closed'} className="sm:max-w-[400px] ios-dialog p-4 max-h-[90vh] overflow-y-auto">
           <DialogHeader className="pb-2">
             <DialogTitle className="text-[#1c1c1e] text-[17px] font-semibold">{getModalTitle()}</DialogTitle>
           </DialogHeader>
