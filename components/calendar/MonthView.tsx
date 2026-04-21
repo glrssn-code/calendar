@@ -46,6 +46,7 @@ export function MonthView({
 }: MonthViewProps) {
   const [hoveredDate, setHoveredDate] = useState<Date | null>(null);
   const [moreTooltip, setMoreTooltip] = useState<{ dateKey: string; events: CalendarEvent[]; x: number; y: number } | null>(null);
+  const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // 过滤后的事件
@@ -180,9 +181,12 @@ export function MonthView({
                       className="text-[10px] text-blue-500 px-1 cursor-pointer hover:text-blue-600 font-medium"
                       onClick={(e) => {
                         e.stopPropagation();
-                        // 点击更多时不打开弹窗，而是显示 tooltip
                       }}
                       onMouseEnter={(e) => {
+                        if (tooltipTimeoutRef.current) {
+                          clearTimeout(tooltipTimeoutRef.current);
+                          tooltipTimeoutRef.current = null;
+                        }
                         const rect = (e.target as HTMLElement).getBoundingClientRect();
                         setMoreTooltip({
                           dateKey,
@@ -191,7 +195,11 @@ export function MonthView({
                           y: rect.top,
                         });
                       }}
-                      onMouseLeave={() => setMoreTooltip(null)}
+                      onMouseLeave={() => {
+                        tooltipTimeoutRef.current = setTimeout(() => {
+                          setMoreTooltip(null);
+                        }, 150);
+                      }}
                     >
                       +{dayEvents.length - 5} 更多
                     </div>
@@ -211,8 +219,17 @@ export function MonthView({
             left: moreTooltip.x,
             top: moreTooltip.y + 20,
           }}
-          onMouseEnter={() => setMoreTooltip(moreTooltip)}
-          onMouseLeave={() => setMoreTooltip(null)}
+          onMouseEnter={() => {
+            if (tooltipTimeoutRef.current) {
+              clearTimeout(tooltipTimeoutRef.current);
+              tooltipTimeoutRef.current = null;
+            }
+          }}
+          onMouseLeave={() => {
+            tooltipTimeoutRef.current = setTimeout(() => {
+              setMoreTooltip(null);
+            }, 150);
+          }}
         >
           <div className="text-[10px] text-slate-500 mb-1.5 pb-1 border-b border-slate-100">
             剩余 {moreTooltip.events.length} 项
