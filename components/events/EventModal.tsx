@@ -148,16 +148,18 @@ export function EventModal({
       }
     }
 
-    // 处理提醒权限
+    // 先关闭弹窗
+    onClose();
+
+    // 处理提醒权限（异步，不阻塞关闭）
     const eventsWithReminder = events.filter(e => e.reminderEnabled);
     if (eventsWithReminder.length > 0) {
-      const hasPermission = await requestPermission();
-      if (!hasPermission) {
-        toast.warning('事件已创建，但需要允许通知权限才能收到提醒');
-      }
+      requestPermission().then(hasPermission => {
+        if (!hasPermission) {
+          toast.warning('事件已创建，但需要允许通知权限才能收到提醒');
+        }
+      });
     }
-
-    onClose();
   };
 
   const handleDelete = () => {
@@ -200,7 +202,7 @@ export function EventModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="sm:max-w-[400px] ios-dialog p-4 max-h-[90vh] overflow-y-auto">
+        <DialogContent key={isOpen ? 'dialog-open' : 'dialog-closed'} className="sm:max-w-[400px] ios-dialog p-4 max-h-[90vh] overflow-y-auto">
           <DialogHeader className="pb-2">
             <DialogTitle className="text-[#1c1c1e] text-[17px] font-semibold">{getModalTitle()}</DialogTitle>
           </DialogHeader>
