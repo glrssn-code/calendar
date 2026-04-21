@@ -344,6 +344,7 @@ export function WeeklyCalendar({
         completed: note.completed, // 使用便签的完成状态
         isAllDay: false,
         sourceNoteId: note.id, // 链接到便签
+        repeatType: 'none', // 默认无重复
       });
 
       // 将事件ID添加到便签的关联列表

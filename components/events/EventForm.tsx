@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { format, addDays } from 'date-fns';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { format, addDays, addMonths, parseISO, getDay, getDate, getMonth, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getWeek } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -15,16 +16,16 @@ import {
 } from '@/components/ui/select';
 import { TimePicker } from '@/components/ui/time-picker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { CalendarEvent, EventColor, NewEvent, CATEGORY_OPTIONS, CATEGORY_COLORS } from '@/types/event';
+import { CalendarEvent, EventColor, NewEvent, CATEGORY_OPTIONS, CATEGORY_COLORS, RepeatType } from '@/types/event';
 import { parseChineseDateTime, formatParsedResult, isValidParsedResult } from '@/lib/nlpParser';
-import { Sparkles, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, Calendar, Repeat, X } from 'lucide-react';
 import { COLOR_CATEGORY_MAP } from '@/lib/constants';
 
 interface EventFormProps {
   initialDate?: Date;
   initialHour?: number;
   initialEvent?: CalendarEvent;
-  onSubmit: (event: NewEvent | CalendarEvent) => void;
+  onSubmit: (event: NewEvent | CalendarEvent | NewEvent[]) => void;
   onCancel: () => void;
   onDelete?: () => void;
   defaultUseSmartInput?: boolean;
@@ -108,7 +109,92 @@ export function EventForm({
   );
   const [category, setCategory] = useState<string>(initialEvent?.category || '售前');
   const [isUrgent, setIsUrgent] = useState(initialEvent?.isUrgent || false);
-  const [isAllDay, setIsAllDay] = useState(initialEvent?.isAllDay || false);
+  const [repeatEnabled, setRepeatEnabled] = useState(!!initialEvent?.repeatType && initialEvent.repeatType !== 'none');
+  const [repeatType, setRepeatType] = useState<RepeatType>(initialEvent?.repeatType || 'none');
+  const [repeatEndDate, setRepeatEndDate] = useState(initialEvent?.repeatEndDate || '');
+  // 每周重复选中的星期几 (0=周日, 1=周一, ..., 6=周六)
+  const [weeklyDays, setWeeklyDays] = useState<number[]>([]);
+  // 每月重复的日期
+  const [monthlyDay, setMonthlyDay] = useState<number>(1);
+
+  // 从 repeatType 推断 repeatEnabled
+  useEffect(() => {
+    if (initialEvent?.repeatType && initialEvent.repeatType !== 'none') {
+      setRepeatEnabled(true);
+      setRepeatType(initialEvent.repeatType);
+    }
+  }, [initialEvent]);
+
+  // 当 repeatEnabled 变为 true 且 repeatType 是 none 时，默认设置为每日
+  useEffect(() => {
+    if (repeatEnabled && repeatType === 'none') {
+      setRepeatType('daily');
+    }
+  }, [repeatEnabled, repeatType]);
+
+  // 生成重复事件的辅助函数
+  const generateRepeatInstances = useCallback((baseEvent: NewEvent, endDate?: string): CalendarEvent[] => {
+    if (repeatType === 'none' || !repeatEnabled) return [];
+
+    const events: CalendarEvent[] = [];
+    const repeatId = crypto.randomUUID();
+    const startDate = parseISO(baseEvent.date);
+    const end = endDate ? parseISO(endDate) : addMonths(startDate, 3); // 默认3个月
+
+    let currentDate = startDate;
+    const maxInstances = 365; // 最多生成365个实例
+    let instanceCount = 0;
+
+    while (currentDate <= end && instanceCount < maxInstances) {
+      const dayOfWeek = getDay(currentDate); // 0=周日, 6=周六
+      let shouldCreate = false;
+
+      switch (repeatType) {
+        case 'daily':
+          shouldCreate = true;
+          break;
+        case 'weekly':
+          // 每周重复：按选择的星期几
+          shouldCreate = weeklyDays.length === 0 || weeklyDays.includes(dayOfWeek);
+          break;
+        case 'monthly':
+          // 每月重复：按选择的日期
+          shouldCreate = getDate(currentDate) === monthlyDay;
+          break;
+        case 'yearly':
+          // 每年重复：同月同日
+          shouldCreate = getDate(currentDate) === getDate(startDate) && getMonth(currentDate) === getMonth(startDate);
+          break;
+      }
+
+      if (shouldCreate && !isSameDay(currentDate, startDate)) {
+        events.push({
+          ...baseEvent,
+          id: crypto.randomUUID(),
+          date: format(currentDate, 'yyyy-MM-dd'),
+          repeatId,
+          createdAt: new Date().toISOString(),
+        } as CalendarEvent);
+        instanceCount++;
+      }
+
+      // 日期递增
+      switch (repeatType) {
+        case 'daily':
+          currentDate = addDays(currentDate, 1);
+          break;
+        case 'weekly':
+        case 'monthly':
+          currentDate = addDays(currentDate, 1);
+          break;
+        case 'yearly':
+          currentDate = addMonths(currentDate, 1);
+          break;
+      }
+    }
+
+    return events;
+  }, [repeatType, repeatEnabled, weeklyDays, monthlyDay]);
 
   // 比较两个时间，返回 -1 (t1<t2), 0 (t1==t2), 1 (t1>t2)
   const compareTimes = (t1: string, t2: string): number => {
@@ -219,6 +305,7 @@ export function EventForm({
       category: smartCategory,
       color: result.isUrgent ? 'blue' : CATEGORY_COLORS[smartCategory],
       completed: false,
+      repeatType: 'none',
     };
 
     // 如果时间已过，显示确认对话框
@@ -260,47 +347,61 @@ export function EventForm({
       return;
     }
 
-    // 全天待办不需要时间
-    if (!isAllDay && (!startTime || !endTime)) {
+    // 验证时间
+    if (!startTime || !endTime) {
       return;
     }
 
+    // 验证重复事件必须有结束日期
+    if (repeatEnabled && !repeatEndDate) {
+      return;
+    }
+
+    // 生成 repeatId
+    const repeatId = repeatEnabled && repeatType !== 'none' ? crypto.randomUUID() : undefined;
+
     if (initialEvent) {
-      // Editing existing event - include id and createdAt
+      // Editing existing event - just update, don't generate new instances
       const eventData: CalendarEvent = {
         id: initialEvent.id,
         title: title.trim(),
         description: description.trim(),
         date,
-        startTime: isAllDay ? undefined : startTime,
-        endTime: isAllDay ? undefined : endTime,
-        reminderEnabled: isAllDay ? false : reminderEnabled,
+        startTime,
+        endTime,
+        reminderEnabled,
         reminderMinutes,
         isUrgent,
         category,
         color: isUrgent ? 'blue' : CATEGORY_COLORS[category],
         completed: initialEvent.completed,
-        isAllDay,
         createdAt: initialEvent.createdAt,
+        repeatType: repeatEnabled ? repeatType : 'none',
+        repeatEndDate: repeatEnabled ? repeatEndDate : undefined,
+        repeatId: initialEvent.repeatId, // 保持原有的 repeatId
       };
       onSubmit(eventData);
     } else {
-      // Creating new event - no id or createdAt
+      // Creating new event
       const eventData: NewEvent = {
         title: title.trim(),
         description: description.trim(),
         date,
-        startTime: isAllDay ? undefined : startTime,
-        endTime: isAllDay ? undefined : endTime,
-        reminderEnabled: isAllDay ? false : reminderEnabled,
+        startTime,
+        endTime,
+        reminderEnabled,
         reminderMinutes,
         isUrgent,
         category,
         color: isUrgent ? 'blue' : CATEGORY_COLORS[category],
         completed: false,
-        isAllDay,
+        repeatType: repeatEnabled ? repeatType : 'none',
+        repeatEndDate: repeatEnabled ? repeatEndDate : undefined,
+        repeatId,
       };
-      onSubmit(eventData);
+      // 生成重复事件实例
+      const repeatInstances = repeatEnabled ? generateRepeatInstances(eventData, repeatEndDate) : [];
+      onSubmit([eventData, ...repeatInstances]);
     }
   };
 
@@ -447,19 +548,17 @@ export function EventForm({
             />
           </div>
 
-          {/* 提醒 + 紧急事件 + 全天 放一行 */}
+          {/* 提醒 + 紧急事件 + 重复 放一行 */}
           <div className="grid grid-cols-3 gap-2">
-            {!isAllDay && (
-              <div className="flex items-center justify-between py-2 px-2 bg-slate-50 rounded-lg">
-                <Label htmlFor="reminder" className="text-slate-700 font-medium text-xs">提醒</Label>
-                <Switch
-                  id="reminder"
-                  checked={reminderEnabled}
-                  onCheckedChange={setReminderEnabled}
-                  className="data-[checked]:bg-blue-500 scale-90"
-                />
-              </div>
-            )}
+            <div className="flex items-center justify-between py-2 px-2 bg-slate-50 rounded-lg">
+              <Label htmlFor="reminder" className="text-slate-700 font-medium text-xs">提醒</Label>
+              <Switch
+                id="reminder"
+                checked={reminderEnabled}
+                onCheckedChange={setReminderEnabled}
+                className="data-[checked]:bg-blue-500 scale-90"
+              />
+            </div>
 
             <div className="flex items-center justify-between py-2 px-2 bg-slate-50 rounded-lg">
               <Label className="text-slate-700 font-medium text-xs">紧急</Label>
@@ -471,36 +570,148 @@ export function EventForm({
             </div>
 
             <div className="flex items-center justify-between py-2 px-2 bg-slate-50 rounded-lg">
-              <Label htmlFor="allDay" className="text-slate-700 font-medium text-xs">全天</Label>
+              <Label htmlFor="repeat" className="text-slate-700 font-medium text-xs">重复</Label>
               <Switch
-                id="allDay"
-                checked={isAllDay}
-                onCheckedChange={(checked) => {
-                  setIsAllDay(checked);
-                  if (checked) setReminderEnabled(false);
-                }}
-                className="data-[checked]:bg-blue-500 scale-90"
+                id="repeat"
+                checked={repeatEnabled}
+                onCheckedChange={setRepeatEnabled}
+                className="data-[checked]:bg-purple-500 scale-90"
               />
             </div>
           </div>
 
-          {/* 时间选择 - 全天待办时隐藏 */}
-          {!isAllDay && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-slate-700 font-medium text-xs">开始时间</Label>
-                <TimePicker value={startTime} onChange={handleStartTimeChange} />
+          {/* 重复设置 - 如果开启 */}
+          {repeatEnabled && (
+            <div className="space-y-2 p-3 bg-purple-50 rounded-xl border border-purple-100">
+              <div className="flex items-center gap-2 mb-2">
+                <Repeat className="w-4 h-4 text-purple-500" />
+                <span className="text-sm font-medium text-purple-600">重复设置</span>
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-slate-700 font-medium text-xs">结束时间</Label>
-                <TimePicker value={endTime} onChange={handleEndTimeChange} />
+              {/* 重复类型选择 */}
+              <div className="grid grid-cols-4 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRepeatType('daily')}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
+                    repeatType === 'daily'
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-purple-50'
+                  }`}
+                >
+                  每日
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRepeatType('weekly')}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
+                    repeatType === 'weekly'
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-purple-50'
+                  }`}
+                >
+                  每周
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRepeatType('monthly')}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
+                    repeatType === 'monthly'
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-purple-50'
+                  }`}
+                >
+                  每月
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRepeatType('yearly')}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
+                    repeatType === 'yearly'
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-purple-50'
+                  }`}
+                >
+                  每年
+                </button>
+              </div>
+
+              {/* 每周重复：选择星期几 */}
+              {repeatType === 'weekly' && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-slate-500">选择星期</Label>
+                  <div className="flex gap-1">
+                    {['日', '一', '二', '三', '四', '五', '六'].map((day, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => {
+                          setWeeklyDays(prev =>
+                            prev.includes(index)
+                              ? prev.filter(d => d !== index)
+                              : [...prev, index]
+                          );
+                        }}
+                        className={`w-8 h-8 rounded-full text-xs font-medium transition-all ${
+                          weeklyDays.includes(index)
+                            ? 'bg-purple-500 text-white'
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-purple-50'
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 每月重复：选择日期 */}
+              {repeatType === 'monthly' && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-slate-500">选择日期</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={monthlyDay}
+                      onChange={(e) => setMonthlyDay(Number(e.target.value))}
+                      className="w-20 h-8 border-slate-200"
+                    />
+                    <span className="text-xs text-slate-500">日</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 重复结束日期 */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-500">重复结束日期（必填）</Label>
+                <Input
+                  type="date"
+                  value={repeatEndDate}
+                  onChange={(e) => setRepeatEndDate(e.target.value)}
+                  className="h-8 border-slate-200"
+                  required
+                />
               </div>
             </div>
           )}
 
+          {/* 时间选择 */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-slate-700 font-medium text-xs">开始时间</Label>
+              <TimePicker value={startTime} onChange={handleStartTimeChange} />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-slate-700 font-medium text-xs">结束时间</Label>
+              <TimePicker value={endTime} onChange={handleEndTimeChange} />
+            </div>
+          </div>
+
           {/* 提醒时间 - 如果开启 */}
-          {reminderEnabled && !isAllDay && (
+          {reminderEnabled && (
             <div className="space-y-1.5">
               <Label className="text-slate-700 font-medium text-xs">提前提醒时间</Label>
               <Select

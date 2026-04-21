@@ -56,6 +56,13 @@ export function useEventReminders() {
     // 已完成的事件不提醒
     if (event.completed) return;
     if (!event.reminderEnabled && customDelayMs === undefined) return;
+    if (!event.startTime) return; // 没有开始时间不提醒
+
+    // 无效时间检查
+    const dateTimeStr = `${event.date}T${event.startTime}`;
+    if (dateTimeStr.includes('undefined') || dateTimeStr.includes('null')) {
+      return;
+    }
 
     // 清除之前的同一个事件的定时器
     const existingTimeout = timeoutIdsRef.current.get(event.id);
@@ -71,26 +78,25 @@ export function useEventReminders() {
       delay = customDelayMs;
     } else {
       // 计算提醒时间
-      const eventTime = parseISO(`${event.date}T${event.startTime}`).getTime();
+      const eventTime = parseISO(dateTimeStr).getTime();
+      if (isNaN(eventTime)) return; // 无效日期不提醒
+
       const reminderTime = eventTime - event.reminderMinutes * 60 * 1000;
       const now = Date.now();
       delay = reminderTime - now;
     }
 
+    // 过去的时间不提醒
     if (delay <= 0) {
-      // 已经到了提醒时间，立即提醒（但要等组件挂载后）
-      const timeoutId = setTimeout(() => {
-        showReminderNotification(event);
-      }, 100);
-      timeoutIdsRef.current.set(event.id, timeoutId);
-    } else {
-      // 设置定时器
-      const timeoutId = setTimeout(() => {
-        showReminderNotification(event);
-        timeoutIdsRef.current.delete(event.id);
-      }, delay);
-      timeoutIdsRef.current.set(event.id, timeoutId);
+      return;
     }
+
+    // 设置定时器
+    const timeoutId = setTimeout(() => {
+      showReminderNotification(event);
+      timeoutIdsRef.current.delete(event.id);
+    }, delay);
+    timeoutIdsRef.current.set(event.id, timeoutId);
   }, [showReminderNotification]);
 
   const closeReminderModal = useCallback(() => {

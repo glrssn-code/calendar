@@ -262,6 +262,161 @@ export default function SettingsPage() {
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
         {/* Calendar Settings */}
+        {/* Data Management Section */}
+        <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-cyan-50 to-blue-50">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-cyan-100 rounded-lg">
+                <Download className="w-5 h-5 text-cyan-600" />
+              </div>
+              <h2 className="text-lg font-semibold text-slate-800">数据管理</h2>
+            </div>
+          </div>
+          <div className="p-6 space-y-6">
+            {/* 存储状态 */}
+            <div className="p-4 bg-slate-50 rounded-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">当前存储状态</p>
+                  <p className="text-lg font-semibold text-slate-800">
+                    {storageInfo.eventCount} 个事件 · {storageInfo.storageSize}
+                  </p>
+                  {storageInfo.lastUpdated && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      上次更新：{storageInfo.lastUpdated}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 导出按钮 */}
+            <div className="space-y-3">
+              <Label className="text-slate-700 font-medium">导出数据</Label>
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleExportJSON}
+                  variant="outline"
+                  className="flex-1 border-slate-200 hover:bg-slate-50"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  导出 JSON
+                </Button>
+                <Button
+                  onClick={handleExportExcel}
+                  variant="outline"
+                  className="flex-1 border-slate-200 hover:bg-slate-50"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  导出 Excel
+                </Button>
+              </div>
+            </div>
+
+            {/* 一键备份 */}
+            <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-green-800">一键备份</p>
+                  <p className="text-sm text-green-600">导出所有事件和便签，防止数据丢失</p>
+                </div>
+                <Button
+                  onClick={handleBackup}
+                  className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  备份
+                </Button>
+              </div>
+            </div>
+
+            {/* 恢复备份 */}
+            <div className="space-y-3">
+              <Label className="text-slate-700 font-medium">恢复备份</Label>
+              <input
+                ref={backupFileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleBackupFileChange}
+                className="hidden"
+              />
+              <Button
+                onClick={() => backupFileInputRef.current?.click()}
+                variant="outline"
+                className="w-full border-slate-200 hover:bg-slate-50"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                选择备份文件导入
+              </Button>
+              {importBackupError && (
+                <p className="text-sm text-red-500">{importBackupError}</p>
+              )}
+            </div>
+
+            {/* 本地自动备份恢复 */}
+            {localBackupInfo.hasBackup && (
+              <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-amber-800">本地自动备份</p>
+                    <p className="text-sm text-amber-600">
+                      {localBackupInfo.eventCount} 个事件，{localBackupInfo.noteCount} 个便签
+                    </p>
+                    {localBackupInfo.lastSync && (
+                      <p className="text-xs text-amber-500 mt-1">
+                        上次备份：{new Date(localBackupInfo.lastSync).toLocaleString('zh-CN')}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    onClick={handleRestoreFromLocal}
+                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
+                  >
+                    恢复
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* 导入 */}
+            <div className="space-y-3">
+              <Label className="text-slate-700 font-medium">导入数据</Label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                variant="outline"
+                className="w-full border-slate-200 hover:bg-slate-50"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                选择 JSON 文件导入
+              </Button>
+              {importError && (
+                <p className="text-sm text-red-500">{importError}</p>
+              )}
+            </div>
+
+            {/* 清除数据 - 默认隐藏 */}
+            {!showClearButton && (
+              <div className="pt-4 border-t border-slate-100">
+                <Button
+                  onClick={() => setShowClearDialog(true)}
+                  variant="outline"
+                  className="w-full border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600"
+                  style={{ display: 'none' }}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  清除所有事件
+                </Button>
+              </div>
+            )}
+          </div>
+        </section>
         <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-cyan-50">
             <div className="flex items-center gap-3">
@@ -426,161 +581,6 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Data Management Section */}
-        <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-cyan-50 to-blue-50">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-cyan-100 rounded-lg">
-                <Download className="w-5 h-5 text-cyan-600" />
-              </div>
-              <h2 className="text-lg font-semibold text-slate-800">数据管理</h2>
-            </div>
-          </div>
-          <div className="p-6 space-y-6">
-            {/* 存储状态 */}
-            <div className="p-4 bg-slate-50 rounded-xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-500">当前存储状态</p>
-                  <p className="text-lg font-semibold text-slate-800">
-                    {storageInfo.eventCount} 个事件 · {storageInfo.storageSize}
-                  </p>
-                  {storageInfo.lastUpdated && (
-                    <p className="text-xs text-slate-400 mt-1">
-                      上次更新：{storageInfo.lastUpdated}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* 导出按钮 */}
-            <div className="space-y-3">
-              <Label className="text-slate-700 font-medium">导出数据</Label>
-              <div className="flex gap-3">
-                <Button
-                  onClick={handleExportJSON}
-                  variant="outline"
-                  className="flex-1 border-slate-200 hover:bg-slate-50"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  导出 JSON
-                </Button>
-                <Button
-                  onClick={handleExportExcel}
-                  variant="outline"
-                  className="flex-1 border-slate-200 hover:bg-slate-50"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  导出 Excel
-                </Button>
-              </div>
-            </div>
-
-            {/* 一键备份 */}
-            <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-green-800">一键备份</p>
-                  <p className="text-sm text-green-600">导出所有事件和便签，防止数据丢失</p>
-                </div>
-                <Button
-                  onClick={handleBackup}
-                  className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  备份
-                </Button>
-              </div>
-            </div>
-
-            {/* 恢复备份 */}
-            <div className="space-y-3">
-              <Label className="text-slate-700 font-medium">恢复备份</Label>
-              <input
-                ref={backupFileInputRef}
-                type="file"
-                accept=".json"
-                onChange={handleBackupFileChange}
-                className="hidden"
-              />
-              <Button
-                onClick={() => backupFileInputRef.current?.click()}
-                variant="outline"
-                className="w-full border-slate-200 hover:bg-slate-50"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                选择备份文件导入
-              </Button>
-              {importBackupError && (
-                <p className="text-sm text-red-500">{importBackupError}</p>
-              )}
-            </div>
-
-            {/* 本地自动备份恢复 */}
-            {localBackupInfo.hasBackup && (
-              <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-amber-800">本地自动备份</p>
-                    <p className="text-sm text-amber-600">
-                      {localBackupInfo.eventCount} 个事件，{localBackupInfo.noteCount} 个便签
-                    </p>
-                    {localBackupInfo.lastSync && (
-                      <p className="text-xs text-amber-500 mt-1">
-                        上次备份：{new Date(localBackupInfo.lastSync).toLocaleString('zh-CN')}
-                      </p>
-                    )}
-                  </div>
-                  <Button
-                    onClick={handleRestoreFromLocal}
-                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
-                  >
-                    恢复
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* 导入 */}
-            <div className="space-y-3">
-              <Label className="text-slate-700 font-medium">导入数据</Label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                variant="outline"
-                className="w-full border-slate-200 hover:bg-slate-50"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                选择 JSON 文件导入
-              </Button>
-              {importError && (
-                <p className="text-sm text-red-500">{importError}</p>
-              )}
-            </div>
-
-            {/* 清除数据 - 默认隐藏 */}
-            {!showClearButton && (
-              <div className="pt-4 border-t border-slate-100">
-                <Button
-                  onClick={() => setShowClearDialog(true)}
-                  variant="outline"
-                  className="w-full border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600"
-                  style={{ display: 'none' }}
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  清除所有事件
-                </Button>
-              </div>
-            )}
-          </div>
-        </section>
 
         {/* About Section */}
         <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
