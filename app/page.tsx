@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, startOfWeek } from 'date-fns';
 import { EventProvider, useEvents } from '@/context/EventContext';
@@ -11,13 +11,14 @@ import { DayView } from '@/components/calendar/DayView';
 import { MonthView } from '@/components/calendar/MonthView';
 import { EventModal } from '@/components/events/EventModal';
 import { CalendarEvent } from '@/types/event';
-import { Settings, Plus, ChevronLeft, ChevronRight, StickyNote, HelpCircle } from 'lucide-react';
+import { Settings, Plus, ChevronLeft, ChevronRight, StickyNote, HelpCircle, Download } from 'lucide-react';
 import { GlobalReminderHandler } from '@/components/ReminderModal';
 import { useEventFilter } from '@/hooks/useEventFilter';
 import { useSettings } from '@/hooks/useSettings';
 import { StickyNotePanel } from '@/components/stickyNote/StickyNotePanel';
 import { StickyNoteModal } from '@/components/stickyNote/StickyNoteModal';
 import { HelpModal } from '@/components/HelpModal';
+import { createBackup, downloadBackup, generateBackupFilename } from '@/lib/backup';
 
 type ViewType = 'day' | 'week' | 'month';
 
@@ -116,6 +117,22 @@ function HomeContent() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isStickyNoteModalOpen, setIsStickyNoteModalOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+
+  // 手动备份处理
+  const handleBackup = async () => {
+    try {
+      const data = await createBackup();
+      downloadBackup(data, generateBackupFilename());
+      alert('备份文件已下载');
+    } catch (error) {
+      console.error('Backup error:', error);
+      alert('备份失败');
+    }
+  };
+
+  // 月视图连续点击计数（隐藏功能：5次点击进入生活日历）
+  const [monthViewClickCount, setMonthViewClickCount] = useState(0);
+  const monthViewClickTimerRef = useRef<{ lastClickTime: number } | null>(null);
 
   const theme = themes[settings.theme as ThemeKey] || themes.skeuomorphic;
 
@@ -241,8 +258,34 @@ function HomeContent() {
           {views.map((view) => (
             <button
               key={view.value}
-              onClick={() => setCurrentView(view.value)}
-              className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${
+              onClick={() => {
+                if (view.value === 'month') {
+                  // 隐藏功能：连续快速点击月视图5次进入生活日历
+                  const now = Date.now();
+                  const lastClick = monthViewClickTimerRef.current?.lastClickTime || 0;
+
+                  // 如果距离上次点击超过300ms，重置计数
+                  if (now - lastClick > 300) {
+                    setMonthViewClickCount(1);
+                    monthViewClickTimerRef.current = { lastClickTime: now };
+                    setCurrentView(view.value);
+                    return;
+                  }
+
+                  const newCount = monthViewClickCount + 1;
+                  setMonthViewClickCount(newCount);
+                  monthViewClickTimerRef.current = { lastClickTime: now };
+
+                  // 连续点击5次则跳转
+                  if (newCount >= 5) {
+                    setMonthViewClickCount(0);
+                    window.location.href = '/life';
+                    return;
+                  }
+                }
+                setCurrentView(view.value);
+              }}
+              className={`px-3 py-1 rounded-lg text-sm font-medium transition-none ${
                 currentView === view.value ? theme.viewSwitcherBtnActive : theme.viewSwitcherBtnInactive
               }`}
             >
@@ -259,19 +302,19 @@ function HomeContent() {
         }`}>
           <button
             onClick={goPrev}
-            className={`w-7 h-7 flex items-center justify-center rounded transition-all ${theme.navBtn}`}
+            className={`w-7 h-7 flex items-center justify-center rounded transition-none ${theme.navBtn}`}
           >
             <ChevronLeft className={`w-4 h-4 ${theme.navBtnText}`} />
           </button>
           <button
             onClick={goToToday}
-            className={`px-2 h-7 flex items-center justify-center rounded text-xs font-medium transition-all ${theme.todayBtn}`}
+            className={`px-2 h-7 flex items-center justify-center rounded text-xs font-medium transition-none ${theme.todayBtn}`}
           >
             今天
           </button>
           <button
             onClick={goNext}
-            className={`w-7 h-7 flex items-center justify-center rounded transition-all ${theme.navBtn}`}
+            className={`w-7 h-7 flex items-center justify-center rounded transition-none ${theme.navBtn}`}
           >
             <ChevronRight className={`w-4 h-4 ${theme.navBtnText}`} />
           </button>
@@ -288,7 +331,7 @@ function HomeContent() {
               value={filters.searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="搜索..."
-              className={`h-7 pl-7 pr-2 text-xs rounded-lg outline-none w-24 transition-all ${theme.searchInput}`}
+              className={`h-7 pl-7 pr-2 text-xs rounded-lg outline-none w-24 transition-none ${theme.searchInput}`}
             />
             <svg className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -297,7 +340,7 @@ function HomeContent() {
           {filters.searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className={`w-5 h-5 flex items-center justify-center rounded-full transition-all ${theme.clearBtn}`}
+              className={`w-5 h-5 flex items-center justify-center rounded-full transition-none ${theme.clearBtn}`}
             >
               ×
             </button>
@@ -309,7 +352,7 @@ function HomeContent() {
           <select
             value={filters.category}
             onChange={(e) => setCategory(e.target.value as any)}
-            className={`h-7 px-2 text-xs rounded-lg outline-none cursor-pointer transition-all ${theme.select}`}
+            className={`h-7 px-2 text-xs rounded-lg outline-none cursor-pointer transition-none ${theme.select}`}
           >
             <option value="全部">分类</option>
             <option value="售前">售前</option>
@@ -323,7 +366,7 @@ function HomeContent() {
           <select
             value={filters.dateRange}
             onChange={(e) => setDateRange(e.target.value as any)}
-            className={`h-7 px-2 text-xs rounded-lg outline-none cursor-pointer transition-all ${theme.select}`}
+            className={`h-7 px-2 text-xs rounded-lg outline-none cursor-pointer transition-none ${theme.select}`}
           >
             <option value="全部">时间</option>
             <option value="今天">今天</option>
@@ -334,7 +377,7 @@ function HomeContent() {
           <select
             value={filters.status}
             onChange={(e) => setStatus(e.target.value as any)}
-            className={`h-7 px-2 text-xs rounded-lg outline-none cursor-pointer transition-all ${theme.select}`}
+            className={`h-7 px-2 text-xs rounded-lg outline-none cursor-pointer transition-none ${theme.select}`}
           >
             <option value="全部">状态</option>
             <option value="未完成">未完成</option>
@@ -345,7 +388,7 @@ function HomeContent() {
         {/* 紧急按钮 */}
         <button
           onClick={() => setShowUrgentOnly(!filters.showUrgentOnly)}
-          className={`h-7 w-7 flex items-center justify-center rounded-lg text-xs font-bold shadow-sm border transition-all ${
+          className={`h-7 w-7 flex items-center justify-center rounded-lg text-xs font-bold shadow-sm border transition-none ${
             filters.showUrgentOnly ? theme.urgentBtnActive : theme.urgentBtnInactive
           }`}
         >
@@ -357,11 +400,20 @@ function HomeContent() {
         {/* 帮助按钮 */}
         <button
           onClick={() => setIsHelpOpen(true)}
-          className={`h-7 w-7 flex items-center justify-center rounded-lg shadow-sm border transition-all ${theme.navBtn}`}
+          className={`h-7 w-7 flex items-center justify-center rounded-lg shadow-sm border transition-none ${theme.navBtn}`}
         >
           <svg className={`w-3.5 h-3.5 ${theme.navBtnText}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
+        </button>
+
+        {/* 备份按钮 */}
+        <button
+          onClick={handleBackup}
+          className={`h-7 w-7 flex items-center justify-center rounded-lg shadow-sm border transition-none ${theme.navBtn}`}
+          title="下载备份文件"
+        >
+          <Download className={`w-3.5 h-3.5 ${theme.navBtnText}`} />
         </button>
 
         {/* 统计标签 */}
@@ -375,7 +427,7 @@ function HomeContent() {
         {hasActiveFilters && (
           <button
             onClick={resetFilters}
-            className={`h-7 px-2 flex items-center justify-center rounded-lg text-xs transition-all ${theme.resetBtn}`}
+            className={`h-7 px-2 flex items-center justify-center rounded-lg text-xs transition-none ${theme.resetBtn}`}
           >
             重置
           </button>
@@ -421,19 +473,19 @@ function HomeContent() {
       <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-50">
         <button
           onClick={() => setIsStickyNoteModalOpen(true)}
-          className={`w-14 h-14 rounded-full flex items-center justify-center transition-all hover:scale-105 ${theme.fabStickyNote}`}
+          className={`w-14 h-14 rounded-full flex items-center justify-center transition-none hover:scale-105 ${theme.fabStickyNote}`}
         >
           <StickyNote className="w-6 h-6" />
         </button>
         <button
           onClick={handleSmartCreate}
-          className={`w-14 h-14 rounded-full flex items-center justify-center transition-all hover:scale-105 ${theme.fabSmartCreate}`}
+          className={`w-14 h-14 rounded-full flex items-center justify-center transition-none hover:scale-105 ${theme.fabSmartCreate}`}
         >
           <Plus className="w-7 h-7" />
         </button>
         <Link
           href="/settings"
-          className={`w-14 h-14 rounded-full flex items-center justify-center transition-all hover:scale-105 ${theme.fabSettings}`}
+          className={`w-14 h-14 rounded-full flex items-center justify-center transition-none hover:scale-105 ${theme.fabSettings}`}
         >
           <Settings className="w-7 h-7" />
         </Link>
