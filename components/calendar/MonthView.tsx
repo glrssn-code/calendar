@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, isToday } from 'date-fns';
 import { CalendarEvent } from '@/types/event';
+import { createPortal } from 'react-dom';
 
 const MIN_CELL_HEIGHT = 120;
 
@@ -44,6 +45,8 @@ export function MonthView({
   weekStartsOn = 0,
 }: MonthViewProps) {
   const [hoveredDate, setHoveredDate] = useState<Date | null>(null);
+  const [moreTooltip, setMoreTooltip] = useState<{ dateKey: string; events: CalendarEvent[]; x: number; y: number } | null>(null);
+  const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // 过滤后的事件
   const filteredEvents = filteredEventIds
@@ -132,6 +135,9 @@ export function MonthView({
             return (
               <div
                 key={dateKey}
+                ref={(el) => {
+                  if (el) cellRefs.current.set(dateKey, el);
+                }}
                 className={`border-b border-r border-slate-100 p-1 cursor-pointer transition-colors ${
                   isCurrentMonth ? 'bg-white' : 'bg-slate-50'
                 } ${isHovered ? 'bg-blue-50' : ''}`}
@@ -157,7 +163,7 @@ export function MonthView({
 
                 {/* 事件列表 */}
                 <div className="space-y-0.5">
-                  {dayEvents.slice(0, 3).map((event) => (
+                  {dayEvents.slice(0, 5).map((event) => (
                     <div
                       key={event.id}
                       className={`px-1 py-0.5 rounded text-[10px] text-white truncate cursor-pointer hover:opacity-80 transition-opacity ${getEventColor(event.color, event.isUrgent)} ${event.completed ? 'opacity-50 line-through' : ''}`}
@@ -169,9 +175,25 @@ export function MonthView({
                       {event.isAllDay ? event.title : `${event.startTime?.slice(0, 5) || ''} ${event.title}`}
                     </div>
                   ))}
-                  {dayEvents.length > 3 && (
-                    <div className="text-[10px] text-slate-500 px-1">
-                      +{dayEvents.length - 3} 更多
+                  {dayEvents.length > 5 && (
+                    <div
+                      className="text-[10px] text-blue-500 px-1 cursor-pointer hover:text-blue-600 font-medium"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // 点击更多时不打开弹窗，而是显示 tooltip
+                      }}
+                      onMouseEnter={(e) => {
+                        const rect = (e.target as HTMLElement).getBoundingClientRect();
+                        setMoreTooltip({
+                          dateKey,
+                          events: dayEvents.slice(5),
+                          x: rect.left,
+                          y: rect.top,
+                        });
+                      }}
+                      onMouseLeave={() => setMoreTooltip(null)}
+                    >
+                      +{dayEvents.length - 5} 更多
                     </div>
                   )}
                 </div>
@@ -180,6 +202,36 @@ export function MonthView({
           })}
         </div>
       </div>
+
+      {/* 更多事项 Tooltip */}
+      {moreTooltip && createPortal(
+        <div
+          className="fixed z-[100] bg-white rounded-lg shadow-xl border border-slate-200 p-2 max-w-48 text-xs"
+          style={{
+            left: moreTooltip.x,
+            top: moreTooltip.y + 20,
+          }}
+          onMouseEnter={() => setMoreTooltip(moreTooltip)}
+          onMouseLeave={() => setMoreTooltip(null)}
+        >
+          <div className="text-[10px] text-slate-500 mb-1.5 pb-1 border-b border-slate-100">
+            剩余 {moreTooltip.events.length} 项
+          </div>
+          {moreTooltip.events.map((event) => (
+            <div
+              key={event.id}
+              className={`px-1.5 py-0.5 rounded text-white truncate cursor-pointer hover:opacity-80 mb-0.5 ${getEventColor(event.color, event.isUrgent)} ${event.completed ? 'opacity-50 line-through' : ''}`}
+              onClick={() => {
+                setMoreTooltip(null);
+                onEventClick(event);
+              }}
+            >
+              {event.isAllDay ? event.title : `${event.startTime?.slice(0, 5) || ''} ${event.title}`}
+            </div>
+          ))}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
