@@ -8,7 +8,7 @@ Week View - Full week overview with event blocks
 Month View - Monthly calendar grid with event previews
 Event Management
 Create, edit, and delete events with rich details
-Categorize events (e.g., 售前/Pre-sales, 项目/Project)
+Categorize events
 Mark events as urgent or completed
 Set reminders for events
 Filter events by category
