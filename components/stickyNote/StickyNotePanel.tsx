@@ -341,20 +341,20 @@ export function StickyNotePanel({ onCreateEvent, filteredNotes, searchQuery }: S
         )}
       </div>
 
-      {/* 展开面板 */}
-      {isExpanded && (
+      {/* 展开面板 - 使用滑动动画 */}
+      <div
+        className="fixed top-0 bottom-0 z-40 flex flex-col transition-transform duration-300 ease-in-out"
+        style={{
+          right: 0,
+          width: EXPANDED_WIDTH,
+          transform: isExpanded ? 'translateX(0)' : 'translateX(100%)',
+        }}
+      >
+        {/* 磨玻璃背景 */}
         <div
-          className="fixed top-0 bottom-0 z-40 flex flex-col"
-          style={{
-            right: 0,
-            width: EXPANDED_WIDTH,
-          }}
-        >
-          {/* 磨玻璃背景 */}
-          <div
-            className="absolute inset-0 backdrop-blur-xl border-l border-white/30 shadow-2xl rounded-l-2xl"
-            style={{ background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(20px)' }}
-          />
+          className="absolute inset-0 backdrop-blur-xl border-l border-white/30 shadow-2xl rounded-l-2xl"
+          style={{ background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(20px)' }}
+        />
 
           {/* 内容层 */}
           <div className="relative flex flex-col h-full">
@@ -546,7 +546,6 @@ export function StickyNotePanel({ onCreateEvent, filteredNotes, searchQuery }: S
             </div>
           </div>
         </div>
-      )}
 
       {/* 编辑便签弹窗 */}
       {editingNote && (
