@@ -27,24 +27,45 @@ interface ExportDialogProps {
   onExport: (filteredEvents: CalendarEvent[]) => void;
   exportType?: 'excel' | 'json';
   defaultFilename?: string;
+  // 预设置状态
+  initialExportMode?: 'all' | 'filtered';
+  initialStartDate?: string;
+  initialEndDate?: string;
+  initialCategories?: Set<string>;
 }
 
-export function ExportDialog({ isOpen, onClose, events, onExport, exportType = 'excel', defaultFilename }: ExportDialogProps) {
-  const [exportMode, setExportMode] = useState<'all' | 'filtered'>('filtered');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set(CATEGORIES));
+export function ExportDialog({
+  isOpen,
+  onClose,
+  events,
+  onExport,
+  exportType = 'excel',
+  defaultFilename,
+  initialExportMode,
+  initialStartDate,
+  initialEndDate,
+  initialCategories,
+}: ExportDialogProps) {
+  const [exportMode, setExportMode] = useState<'all' | 'filtered'>(initialExportMode || 'filtered');
+  const [startDate, setStartDate] = useState(initialStartDate || '');
+  const [endDate, setEndDate] = useState(initialEndDate || '');
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(initialCategories || new Set(CATEGORIES));
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0); // 0=本周, -1=上周, 1=下周
 
   // 初始化默认时间范围（本周）
   useEffect(() => {
     if (isOpen) {
-      const weekRange = getWeekRange();
-      setStartDate(weekRange.start);
-      setEndDate(weekRange.end);
+      if (initialStartDate && initialEndDate) {
+        setStartDate(initialStartDate);
+        setEndDate(initialEndDate);
+      } else {
+        const weekRange = getWeekRange();
+        setStartDate(weekRange.start);
+        setEndDate(weekRange.end);
+      }
       setCurrentWeekOffset(0);
     }
-  }, [isOpen]);
+  }, [isOpen, initialStartDate, initialEndDate]);
 
   // 周导航
   const goToPreviousWeek = () => {

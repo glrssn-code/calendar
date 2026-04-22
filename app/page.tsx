@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, startOfWeek } from 'date-fns';
+import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
 import { EventProvider, useEvents } from '@/context/EventContext';
 import { useStickyNotes } from '@/context/StickyNoteContext';
 import { UndoProvider, useUndo } from '@/context/UndoContext';
@@ -12,6 +12,9 @@ import { MonthView } from '@/components/calendar/MonthView';
 import { EventModal } from '@/components/events/EventModal';
 import { CalendarEvent } from '@/types/event';
 import { Settings, Plus, ChevronLeft, ChevronRight, StickyNote, HelpCircle, Download } from 'lucide-react';
+import { ExportDialog } from '@/components/export/ExportDialog';
+import { downloadAsJSON, generateFilename } from '@/lib/export';
+import { CATEGORIES } from '@/types/event';
 import { GlobalReminderHandler } from '@/components/ReminderModal';
 import { useEventFilter } from '@/hooks/useEventFilter';
 import { useSettings } from '@/hooks/useSettings';
@@ -117,6 +120,7 @@ function HomeContent() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isStickyNoteModalOpen, setIsStickyNoteModalOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   // 手动备份处理
   const handleBackup = async () => {
@@ -128,6 +132,15 @@ function HomeContent() {
       console.error('Backup error:', error);
       alert('备份失败');
     }
+  };
+
+  // 导出本周数据
+  const handleExportThisWeek = () => {
+    setShowExportDialog(true);
+  };
+
+  const handleFilteredExport = (filteredEvents: CalendarEvent[]) => {
+    downloadAsJSON(filteredEvents, generateFilename('calendar-events', 'json'));
   };
 
   // 月视图连续点击计数（隐藏功能：5次点击进入生活日历）
@@ -236,10 +249,6 @@ function HomeContent() {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setSelectedDate(undefined);
-    setSelectedHour(undefined);
-    setSelectedEvent(null);
-    setUseSmartInput(false);
   };
 
   // 视图切换
@@ -416,6 +425,17 @@ function HomeContent() {
           <Download className={`w-3.5 h-3.5 ${theme.navBtnText}`} />
         </button>
 
+        {/* 导出本周按钮 */}
+        <button
+          onClick={handleExportThisWeek}
+          className={`h-7 w-7 flex items-center justify-center rounded-lg shadow-sm border transition-none ${theme.navBtn}`}
+          title="导出本周数据"
+        >
+          <svg className={`w-3.5 h-3.5 ${theme.navBtnText}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </button>
+
         {/* 统计标签 */}
         {hasActiveFilters && (
           <div className={`h-7 px-2 flex items-center justify-center rounded-lg text-xs font-medium ${theme.statsBadge}`}>
@@ -517,6 +537,18 @@ function HomeContent() {
       <HelpModal
         isOpen={isHelpOpen}
         onClose={() => setIsHelpOpen(false)}
+      />
+
+      <ExportDialog
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        events={state.events}
+        onExport={handleFilteredExport}
+        exportType="json"
+        initialExportMode="filtered"
+        initialStartDate={format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd')}
+        initialEndDate={format(endOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd')}
+        initialCategories={new Set(CATEGORIES)}
       />
     </div>
   );

@@ -45,8 +45,8 @@ export function WeeklyCalendar({
   const dragStartMinutesRef = useRef(0);
   const dragStartDateRef = useRef<Date | null>(null);
   const dragMovedRef = useRef(false);
-
-  // 便签拖拽状态
+  // 拖动结束后阻止点击的锁（解决偶现的拖动后自动弹出编辑页面的bug）
+  const dragClickBlockRef = useRef(false);
   const [stickyNoteDragHint, setStickyNoteDragHint] = useState<{ x: number; y: number; time: string } | null>(null);
   const isStickyNoteDraggingRef = useRef(false);
 
@@ -107,6 +107,7 @@ export function WeeklyCalendar({
     dragStartMinutesRef.current = startMinutes;
     dragStartDateRef.current = date;
     dragMovedRef.current = false;
+    dragClickBlockRef.current = true; // 开始拖动，阻止拖动结束后的点击触发编辑
   }, [HOUR_HEIGHT]);
 
   // 拖动移动
@@ -225,6 +226,10 @@ export function WeeklyCalendar({
     setDragHint(null);
     setIsDragging(false);
     dragMovedRef.current = false;
+    // 延迟清除点击阻止，允许拖动后的点击在150ms后重新生效
+    setTimeout(() => {
+      dragClickBlockRef.current = false;
+    }, 150);
   }, [draggingEvent, dragPreview, updateEvent, HOUR_HEIGHT, dragMovedRef]);
 
   // document 级别的拖动结束处理
@@ -279,6 +284,10 @@ export function WeeklyCalendar({
   }, [onCreateEvent]);
 
   const handleEventClick = useCallback((event: CalendarEvent) => {
+    // 如果刚结束拖动，阻止点击触发编辑弹窗
+    if (dragClickBlockRef.current) {
+      return;
+    }
     onEditEvent(event);
   }, [onEditEvent]);
 
