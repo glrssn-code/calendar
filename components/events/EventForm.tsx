@@ -18,8 +18,10 @@ import { TimePicker } from '@/components/ui/time-picker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { CalendarEvent, EventColor, NewEvent, CATEGORY_OPTIONS, CATEGORY_COLORS, RepeatType } from '@/types/event';
 import { parseChineseDateTime, formatParsedResult, isValidParsedResult } from '@/lib/nlpParser';
-import { Sparkles, ChevronDown, ChevronUp, Calendar, Repeat, X } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, Calendar, Repeat, X, StickyNote } from 'lucide-react';
 import { COLOR_CATEGORY_MAP } from '@/lib/constants';
+import { useStickyNotes } from '@/context/StickyNoteContext';
+import { toast } from 'sonner';
 
 interface EventFormProps {
   initialDate?: Date;
@@ -71,6 +73,9 @@ export function EventForm({
   const [description, setDescription] = useState(initialEvent?.description || '');
   const titleInputRef = useRef<HTMLInputElement>(null);
   const smartInputRef = useRef<HTMLInputElement>(null);
+
+  // 便签功能
+  const { addNote } = useStickyNotes();
 
   // 自动聚焦到输入框
   useEffect(() => {
@@ -338,6 +343,26 @@ export function EventForm({
     setShowPastTimeDialog(false);
     setPendingEvent(null);
     setPastTimeInfo(null);
+  };
+
+  // 添加到便签
+  const handleAddToStickyNote = () => {
+    if (!title.trim()) {
+      toast.error('请先输入标题');
+      return;
+    }
+
+    const noteColor = isUrgent ? 'blue' : CATEGORY_COLORS[category];
+    const noteCompleted = initialEvent?.completed || false;
+
+    addNote({
+      title: title.trim(),
+      content: description || `${initialEvent?.date || date} ${initialEvent?.startTime || startTime} - ${initialEvent?.endTime || endTime}\n分类: ${category}`,
+      color: noteColor,
+      isUrgent: isUrgent,
+      completed: noteCompleted,
+    });
+    toast.success('已添加到便签');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -764,6 +789,12 @@ export function EventForm({
           )}
         </div>
         <div className="flex gap-2">
+          {initialEvent && (
+            <Button type="button" onClick={handleAddToStickyNote} variant="outline" className="border-amber-200 text-amber-600 hover:bg-amber-50 h-8">
+              <StickyNote className="w-4 h-4 mr-1" />
+              添加到便签
+            </Button>
+          )}
           <Button type="button" variant="outline" onClick={onCancel} className="border-slate-200 text-slate-600 hover:bg-slate-50 h-8">
             取消
           </Button>

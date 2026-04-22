@@ -72,6 +72,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
   const scheduleReminder = useCallback((event: CalendarEvent) => {
     if (!event.reminderEnabled) return;
     if (!event.startTime) return; // 没有开始时间不提醒
+    if (event.completed) return; // 已完成的事件不提醒
 
     // 清除之前的定时器
     const existingTimeout = scheduledReminders.get(event.id);
@@ -122,6 +123,20 @@ export function EventProvider({ children }: { children: ReactNode }) {
     console.log('[scheduleReminder] 调用 setTimeout，delay:', delay, 'now:', Date.now());
     const timeoutId = setTimeout(() => {
       console.log('[scheduleReminder] setTimeout 回调执行! 事件:', event.title, '日期:', event.date, '时间:', event.startTime, '延迟了', Date.now() - (reminderTime), 'ms');
+
+      // 重新获取当前事件状态，检查是否已完成
+      const currentEvent = state.events.find(e => e.id === event.id);
+      if (!currentEvent) {
+        console.log('[scheduleReminder] 事件已不存在，跳过提醒');
+        scheduledReminders.delete(event.id);
+        return;
+      }
+      if (currentEvent.completed) {
+        console.log('[scheduleReminder] 事件已标记完成，跳过提醒');
+        scheduledReminders.delete(event.id);
+        return;
+      }
+
       const settings = getSettings();
 
       // 触发浏览器通知
@@ -267,13 +282,25 @@ export function EventProvider({ children }: { children: ReactNode }) {
   }, [state.events]);
 
   const updateEvent = useCallback((event: CalendarEvent) => {
+    // 取消该事件的旧提醒定时器
+    const existingTimeout = scheduledReminders.get(event.id);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+      scheduledReminders.delete(event.id);
+    }
+
+    // 如果事件有提醒设置且未完成，重新调度提醒
+    if (event.reminderEnabled && !event.completed) {
+      scheduleReminder(event);
+    }
+
     // 更新 IndexedDB
     eventDB.put(event).catch(err => console.error('Failed to update event:', err));
     dispatch({ type: 'UPDATE_EVENT', payload: event });
     // 备份到 localStorage
     const updatedEvents = state.events.map(e => e.id === event.id ? event : e);
     backupEventsToLocal(updatedEvents);
-  }, [state.events]);
+  }, [state.events, scheduleReminder]);
 
   const deleteEvent = useCallback((id: string) => {
     // 清除该事件的定时器

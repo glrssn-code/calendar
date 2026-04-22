@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { LifeDiary, LifeNote, getDiaries, getNotes, addDiary, updateDiary, deleteDiary, addNote, updateNote, deleteNote, getDiariesByDate, getNotesByDate } from '@/lib/lifeStorage';
+import { useUndo } from './UndoContext';
 
 interface LifeCalendarState {
   diaries: LifeDiary[];
@@ -29,6 +30,8 @@ export function LifeCalendarProvider({ children }: { children: React.ReactNode }
     notes: [],
     isLoading: true,
   });
+
+  const { pushAction } = useUndo();
 
   const refreshData = useCallback(async () => {
     try {
@@ -62,12 +65,28 @@ export function LifeCalendarProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const handleDeleteDiary = useCallback(async (id: string) => {
+    const diaryToDelete = state.diaries.find(d => d.id === id);
+    if (diaryToDelete) {
+      pushAction({
+        type: 'DELETE_DIARY',
+        description: '删除日记',
+        previousData: diaryToDelete,
+        undo: async () => {
+          await addDiary({
+            date: diaryToDelete.date,
+            content: diaryToDelete.content,
+            mood: diaryToDelete.mood,
+            weather: diaryToDelete.weather,
+          });
+        },
+      });
+    }
     await deleteDiary(id);
     setState(prev => ({
       ...prev,
       diaries: prev.diaries.filter(d => d.id !== id),
     }));
-  }, []);
+  }, [state.diaries, pushAction]);
 
   const handleAddNote = useCallback(async (note: Omit<LifeNote, 'id' | 'createdAt'>) => {
     const newNote = await addNote(note);
@@ -87,12 +106,30 @@ export function LifeCalendarProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const handleDeleteNote = useCallback(async (id: string) => {
+    const noteToDelete = state.notes.find(n => n.id === id);
+    if (noteToDelete) {
+      pushAction({
+        type: 'DELETE_LIFE_NOTE',
+        description: '删除便签',
+        previousData: noteToDelete,
+        undo: async () => {
+          await addNote({
+            title: noteToDelete.title,
+            content: noteToDelete.content,
+            color: noteToDelete.color,
+            isUrgent: noteToDelete.isUrgent,
+            completed: noteToDelete.completed,
+            linkedDate: noteToDelete.linkedDate,
+          });
+        },
+      });
+    }
     await deleteNote(id);
     setState(prev => ({
       ...prev,
       notes: prev.notes.filter(n => n.id !== id),
     }));
-  }, []);
+  }, [state.notes, pushAction]);
 
   const handleGetDiariesByDate = useCallback(async (date: string) => {
     return getDiariesByDate(date);

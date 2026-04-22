@@ -46,6 +46,10 @@ export function EventModal({
   const [showReminderRepeatDialog, setShowReminderRepeatDialog] = useState(false);
   const [pendingReminderUpdate, setPendingReminderUpdate] = useState<{ event: CalendarEvent; reminderEnabled: boolean; reminderMinutes: number } | null>(null);
 
+  // 修改重复事件内容确认
+  const [showEditRepeatDialog, setShowEditRepeatDialog] = useState(false);
+  const [pendingEditUpdate, setPendingEditUpdate] = useState<CalendarEvent | null>(null);
+
   useEffect(() => {
     if (isOpen && initialEvent?.reminderEnabled) {
       requestPermission();
@@ -108,6 +112,34 @@ export function EventModal({
     onClose(); // 关闭编辑弹窗
   };
 
+  // 处理修改重复事件内容
+  const handleUpdateRepeatEvent = (choice: 'single' | 'all') => {
+    if (!pendingEditUpdate) return;
+
+    if (choice === 'all' && pendingEditUpdate.repeatId) {
+      // 修改所有重复事件的内容
+      const eventsToUpdate = state.events.filter(e => e.repeatId === pendingEditUpdate.repeatId);
+      eventsToUpdate.forEach(e => {
+        updateEvent({
+          ...e,
+          title: pendingEditUpdate.title,
+          description: pendingEditUpdate.description,
+          category: pendingEditUpdate.category,
+          color: pendingEditUpdate.color,
+        });
+      });
+      toast.success(`已修改所有 ${eventsToUpdate.length} 个重复事件的内容`);
+    } else {
+      // 只修改当前事件
+      updateEvent(pendingEditUpdate);
+      toast.success('事件已更新');
+    }
+
+    setShowEditRepeatDialog(false);
+    setPendingEditUpdate(null);
+    onClose();
+  };
+
   const handleSubmit = async (eventData: NewEvent | CalendarEvent | NewEvent[]) => {
     // 处理重复事件数组
     const events = Array.isArray(eventData) ? eventData : [eventData];
@@ -129,6 +161,13 @@ export function EventModal({
           reminderMinutes: (eventData as CalendarEvent).reminderMinutes,
         });
         setShowReminderRepeatDialog(true);
+        return;
+      }
+
+      // 如果是重复事件，显示确认对话框（内容修改）
+      if (initialEvent.repeatId) {
+        setPendingEditUpdate(events[0] as CalendarEvent);
+        setShowEditRepeatDialog(true);
         return;
       }
 
@@ -284,6 +323,45 @@ export function EventModal({
               onClick={() => {
                 setShowReminderRepeatDialog(false);
                 setPendingReminderUpdate(null);
+              }}
+              variant="outline"
+              className="w-full"
+            >
+              取消
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 修改重复事件内容确认对话框 */}
+      <Dialog open={showEditRepeatDialog} onOpenChange={setShowEditRepeatDialog}>
+        <DialogContent className="sm:max-w-[360px] ios-dialog p-4">
+          <DialogHeader className="pb-2">
+            <div className="mx-auto w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mb-2">
+              <AlertTriangle className="w-6 h-6 text-amber-500" />
+            </div>
+            <DialogTitle className="text-center text-lg">修改重复事件</DialogTitle>
+            <DialogDescription className="text-center text-sm text-slate-500">
+              这是一个重复事件，选择修改范围
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button
+              onClick={() => handleUpdateRepeatEvent('single')}
+              className="w-full bg-slate-200 hover:bg-slate-300 text-slate-700"
+            >
+              只修改这一条
+            </Button>
+            <Button
+              onClick={() => handleUpdateRepeatEvent('all')}
+              className="w-full bg-amber-500 hover:bg-amber-600 text-white"
+            >
+              修改所有重复事件
+            </Button>
+            <Button
+              onClick={() => {
+                setShowEditRepeatDialog(false);
+                setPendingEditUpdate(null);
               }}
               variant="outline"
               className="w-full"

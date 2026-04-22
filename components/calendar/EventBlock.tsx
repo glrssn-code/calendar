@@ -31,6 +31,7 @@ export function EventBlock({ event, onClick, height, theme = 'skeuomorphic', onD
   const buttonRef = useRef<HTMLButtonElement>(null);
   const titleRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastClickTimeRef = useRef(0);
 
@@ -107,7 +108,16 @@ export function EventBlock({ event, onClick, height, theme = 'skeuomorphic', onD
           } : {}),
         }}
         onClick={(e) => {
+          // 如果发生过拖动，不触发点击
           if (isDraggingRef.current) return;
+
+          // 检查是否真的有移动（防止误触）
+          if (dragStartPosRef.current) {
+            const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
+            const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
+            // 如果移动距离超过5px，认为是拖动而非点击
+            if (dx > 5 || dy > 5) return;
+          }
 
           const now = Date.now();
           // 如果距离上次点击少于 240ms，认为是双击的一部分，不处理
@@ -117,7 +127,7 @@ export function EventBlock({ event, onClick, height, theme = 'skeuomorphic', onD
           lastClickTimeRef.current = now;
 
           e.stopPropagation();
-          // 延迟 240ms 处理单击，如果期间发生双击会被取消
+          // 延迟处理单击，如果期间发生双击会被取消
           clickTimeoutRef.current = setTimeout(() => {
             onClick(event);
           }, 250);
@@ -143,12 +153,17 @@ export function EventBlock({ event, onClick, height, theme = 'skeuomorphic', onD
           e.stopPropagation();
           setIsDragging(true);
           isDraggingRef.current = true;
+          dragStartPosRef.current = { x: e.clientX, y: e.clientY };
           onDragStart?.(event, e);
         }}
         onMouseUp={() => {
           if (isDraggingRef.current) {
             setIsDragging(false);
             isDraggingRef.current = false;
+            // 延迟重置 dragStartPosRef，确保 onClick 能访问到
+            setTimeout(() => {
+              dragStartPosRef.current = null;
+            }, 300);
             onDragEnd?.();
           }
         }}

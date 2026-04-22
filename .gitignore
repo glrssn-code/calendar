@@ -56,3 +56,6 @@ calendar-portable/
 electron/*.ts
 !electron/main.ts
 !electron/preload.ts
+
+# Release files (store each version under releases/vX.X.X/)
+releases/

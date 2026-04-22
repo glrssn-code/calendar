@@ -3,7 +3,7 @@
 import { createContext, useContext, useCallback, useRef, useEffect, ReactNode } from 'react';
 
 // 操作类型
-type ActionType = 'DELETE_EVENT' | 'DELETE_STICKY_NOTE' | 'UPDATE_EVENT' | 'UPDATE_STICKY_NOTE';
+type ActionType = 'DELETE_EVENT' | 'DELETE_STICKY_NOTE' | 'UPDATE_EVENT' | 'UPDATE_STICKY_NOTE' | 'DELETE_DIARY' | 'DELETE_LIFE_NOTE';
 
 interface UndoAction {
   type: ActionType;

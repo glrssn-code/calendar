@@ -17,7 +17,6 @@
     "appId": "com.calendar.app",
     "productName": "Calendar",
     "asar": false,
-    "main": "electron/main.js",
     "directories": {
       "output": "dist-electron"
     },
@@ -41,6 +40,7 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true
     },
+    "forceCodeSigning": false,
     "extraMetadata": {
       "main": "electron/main.js"
     }

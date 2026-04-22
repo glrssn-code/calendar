@@ -1,36 +1,114 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Calendar
 
-## Getting Started
+A modern calendar application with rich data visualization and event management features.
 
-First, run the development server:
+![Version](https://img.shields.io/badge/version-1.2.11-blue)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20HTML-green)
+![License](https://img.shields.io/badge/license-MIT-yellow)
 
+## Features
+
+### Calendar Views
+- **Day View** - Hourly schedule display with current time indicator
+- **Week View** - Full week overview with event blocks
+- **Month View** - Monthly calendar grid with event previews
+
+### Event Management
+- Create, edit, and delete events with rich details
+- Categorize events (e.g., 售前/Pre-sales, 项目/Project)
+- Mark events as urgent or completed
+- Set reminders for events
+- Filter events by category
+
+### Data Statistics Panel
+Comprehensive data visualization dashboard:
+- Completion rate display (weekly & cumulative)
+- Category distribution (dual pie charts)
+- 4-week trend line chart
+- 24 solar terms heatmap
+- Monthly distribution bar chart
+
+### Export
+- Export events to JSON format
+- Export current week's events
+- Grouped by category
+
+### Desktop App
+- Native Windows application via Electron
+- Standalone executable, no installation required
+
+## Screenshots
+
+*Coming soon*
+
+## Quick Start
+
+### HTML Version
+
+1. Navigate to `releases/v1.2.11/html/`
+2. Double-click `start.bat`
+3. Open http://localhost:3000 in your browser
+
+Or use command line:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd releases/v1.2.11/html
+npx serve . -p 3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Desktop App
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Navigate to `releases/v1.2.11/win/` and double-click `Calendar.exe`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Development
 
-## Learn More
+```bash
+# Install dependencies
+npm install
 
-To learn more about Next.js, take a look at the following resources:
+# Start development server
+npm run dev
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Build for production
+npm run build
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Build Electron app
+npm run electron:build
+```
 
-## Deploy on Vercel
+## Tech Stack
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Framework**: Next.js 16 with React 19
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **Desktop**: Electron
+- **Date Handling**: date-fns
+- **Database**: Dexie (IndexedDB)
+- **Charts**: Custom SVG visualizations
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Project Structure
+
+```
+calendar/
+├── app/                 # Next.js app directory
+│   ├── page.tsx         # Main calendar page
+│   ├── life/            # Life calendar page
+│   └── settings/        # Settings page
+├── components/
+│   ├── calendar/        # Calendar components (DayView, WeekView, MonthView)
+│   ├── events/          # Event components (EventBlock, EventForm)
+│   └── stats/           # Statistics panel components
+├── context/             # React context providers
+├── hooks/               # Custom React hooks
+├── lib/                 # Utility functions
+├── types/               # TypeScript type definitions
+├── electron/            # Electron main & preload scripts
+└── releases/            # Release versions (gitignored)
+```
+
+## License
+
+MIT License
+
+## Changelog
+
+See [RELEASES.md](RELEASES.md) for release history.

@@ -79,8 +79,8 @@ const helpPages = [
               <Calendar className="w-4 h-4 text-indigo-600" />
             </div>
             <div>
-              <p className="font-medium text-slate-800">全天待办</p>
-              <p className="text-slate-500">开启全天待办选项，事件将显示在日历顶部的全天区域。</p>
+              <p className="font-medium text-slate-800">事件分类</p>
+              <p className="text-slate-500">为事件选择分类（如售前、项目），可在状态栏筛选不同分类的事件。</p>
             </div>
           </div>
         </div>
@@ -88,37 +88,46 @@ const helpPages = [
     ),
   },
   {
-    title: '便签功能',
+    title: '数据统计',
     icon: StickyNote,
     content: (
       <div className="space-y-4 text-sm text-slate-600">
-        <p>便签功能帮助您快速记录想法和待办事项：</p>
+        <p>点击状态栏的"统计"按钮，可打开数据统计面板：</p>
         <div className="space-y-3">
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-yellow-100 flex items-center justify-center flex-shrink-0">
-              <StickyNote className="w-4 h-4 text-yellow-600" />
+            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+              <Clock className="w-4 h-4 text-blue-600" />
             </div>
             <div>
-              <p className="font-medium text-slate-800">创建便签</p>
-              <p className="text-slate-500">点击右下角的黄色便签按钮，打开便签面板，创建新的便签。</p>
+              <p className="font-medium text-slate-800">完成率统计</p>
+              <p className="text-slate-500">查看本周/累计完成率，以环形进度图展示。</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-              <MousePointer className="w-4 h-4 text-orange-500" />
+            <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+              <Calendar className="w-4 h-4 text-green-600" />
             </div>
             <div>
-              <p className="font-medium text-slate-800">拖拽创建日程</p>
-              <p className="text-slate-500">将便签拖拽到日历中的日期和时间，即可快速创建一个关联的事件。</p>
+              <p className="font-medium text-slate-800">类别分布</p>
+              <p className="text-slate-500">双饼图展示累计和本周的分类分布对比。</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-pink-100 flex items-center justify-center flex-shrink-0">
-              <Bell className="w-4 h-4 text-pink-500" />
+            <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+              <MousePointer className="w-4 h-4 text-purple-600" />
             </div>
             <div>
-              <p className="font-medium text-slate-800">同步更新</p>
-              <p className="text-slate-500">修改便签或事件的颜色、完成状态等信息，关联的事件/便签会自动同步。</p>
+              <p className="font-medium text-slate-800">四周趋势</p>
+              <p className="text-slate-500">折线图展示近四周的事件完成趋势。</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <Bell className="w-4 h-4 text-amber-600" />
+            </div>
+            <div>
+              <p className="font-medium text-slate-800">年度分布</p>
+              <p className="text-slate-500">柱状图展示年度月份事件分布及节气热力图。</p>
             </div>
           </div>
         </div>
@@ -146,7 +155,11 @@ const helpPages = [
           </div>
           <div className="bg-slate-50 rounded-lg p-3">
             <p className="font-medium text-slate-800 mb-1">撤销操作</p>
-            <p className="text-slate-500">删除事件或便签后，按 Ctrl+Z (Windows) 可撤销删除操作。</p>
+            <p className="text-slate-500">删除事件后，按 Ctrl+Z (Windows) 可撤销删除操作。</p>
+          </div>
+          <div className="bg-slate-50 rounded-lg p-3">
+            <p className="font-medium text-slate-800 mb-1">导出本周</p>
+            <p className="text-slate-500">点击状态栏的"导出本周"按钮，可导出本周数据为 JSON 格式。</p>
           </div>
         </div>
       </div>
