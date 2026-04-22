@@ -82,10 +82,16 @@ export function EventModal({
     if (!pendingReminderUpdate) return;
 
     const { event, reminderEnabled, reminderMinutes } = pendingReminderUpdate;
+    const repeatId = event.repeatId || pendingEditUpdate?.repeatId;
 
-    if (choice === 'all' && event.repeatId) {
+    console.log('[handleUpdateRepeatReminder] pendingReminderUpdate.event.repeatId:', event.repeatId);
+    console.log('[handleUpdateRepeatReminder] pendingEditUpdate?.repeatId:', pendingEditUpdate?.repeatId);
+    console.log('[handleUpdateRepeatReminder] 最终 repeatId:', repeatId);
+
+    if (choice === 'all' && repeatId) {
       // 修改所有重复事件的提醒
-      const eventsToUpdate = state.events.filter(e => e.repeatId === event.repeatId);
+      const eventsToUpdate = state.events.filter(e => e.repeatId === repeatId);
+      console.log('[handleUpdateRepeatReminder] 应用所有，state.events 总数:', state.events.length, 'repeatId:', repeatId, '找到事件:', eventsToUpdate.length);
       eventsToUpdate.forEach(e => {
         updateEvent({ ...e, reminderEnabled, reminderMinutes });
       });
@@ -99,9 +105,9 @@ export function EventModal({
       toast.success('提醒已修改');
 
       // 取消其他相同 repeatId 事件的旧定时器（通过重新调度）
-      if (event.repeatId) {
+      if (repeatId) {
         // 触发重新调度，这会清除所有旧定时器并为当前事件设置新的
-        const otherEvents = state.events.filter(e => e.repeatId === event.repeatId && e.id !== event.id);
+        const otherEvents = state.events.filter(e => e.repeatId === repeatId && e.id !== event.id);
         // 这些其他事件的提醒设置没有改变，但它们的定时器会被清除
         // 因为 rescheduleReminders 会基于当前 state.events 重新设置所有定时器
       }
@@ -117,20 +123,30 @@ export function EventModal({
     if (!pendingEditUpdate) return;
 
     if (choice === 'all' && pendingEditUpdate.repeatId) {
-      // 修改所有重复事件的内容
+      // 修改所有重复事件的内容，但保留每个事件的原始日期和时间
       const eventsToUpdate = state.events.filter(e => e.repeatId === pendingEditUpdate.repeatId);
+      console.log('[handleUpdateRepeatEvent] 应用所有，当前事件:', pendingEditUpdate.id, '找到要更新的事件:', eventsToUpdate.length);
       eventsToUpdate.forEach(e => {
-        updateEvent({
-          ...e,
+        // 只更新内容相关的字段，保留每个事件原有的 date, startTime, endTime, createdAt 等
+        const updatedEvent: CalendarEvent = {
+          ...e, // 以当前事件为基础
           title: pendingEditUpdate.title,
           description: pendingEditUpdate.description,
           category: pendingEditUpdate.category,
           color: pendingEditUpdate.color,
-        });
+          reminderEnabled: pendingEditUpdate.reminderEnabled,
+          reminderMinutes: pendingEditUpdate.reminderMinutes,
+          isUrgent: pendingEditUpdate.isUrgent,
+          // 保留原有的 repeatId（如果需要更新的话）
+          repeatId: e.repeatId,
+        };
+        console.log('[handleUpdateRepeatEvent] 更新事件:', updatedEvent.id, updatedEvent.title, '原date:', e.date, '新date:', updatedEvent.date);
+        updateEvent(updatedEvent);
       });
       toast.success(`已修改所有 ${eventsToUpdate.length} 个重复事件的内容`);
     } else {
       // 只修改当前事件
+      console.log('[handleUpdateRepeatEvent] 只修改当前事件:', pendingEditUpdate.id);
       updateEvent(pendingEditUpdate);
       toast.success('事件已更新');
     }

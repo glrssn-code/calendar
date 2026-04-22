@@ -134,6 +134,20 @@ export function EventForm({
     if (initialEvent?.repeatType && initialEvent.repeatType !== 'none') {
       setRepeatEnabled(true);
       setRepeatType(initialEvent.repeatType);
+      // 解析 repeatDays bitmask 到 weeklyDays 数组
+      if (initialEvent.repeatDays) {
+        const days: number[] = [];
+        for (let i = 0; i < 7; i++) {
+          if (initialEvent.repeatDays & (1 << i)) {
+            days.push(i);
+          }
+        }
+        setWeeklyDays(days);
+      }
+      // 设置每月重复的日期
+      if (initialEvent.repeatDayOfMonth) {
+        setMonthlyDay(initialEvent.repeatDayOfMonth);
+      }
     }
   }, [initialEvent]);
 
@@ -149,7 +163,8 @@ export function EventForm({
     if (repeatType === 'none' || !repeatEnabled) return [];
 
     const events: CalendarEvent[] = [];
-    const repeatId = crypto.randomUUID();
+    // 使用 baseEvent 中的 repeatId，确保所有重复事件共享同一个 repeatId
+    const repeatId = baseEvent.repeatId || crypto.randomUUID();
     const startDate = parseISO(baseEvent.date);
     const end = endDate ? parseISO(endDate) : addMonths(startDate, 3); // 默认3个月
 
@@ -441,6 +456,8 @@ export function EventForm({
           repeatType: repeatEnabled ? repeatType : 'none',
           repeatEndDate: repeatEnabled ? repeatEndDate : undefined,
           repeatId: initialEvent.repeatId, // 保持原有的 repeatId
+          repeatDays: repeatEnabled ? weeklyDays.reduce((acc, day) => acc | (1 << day), 0) : undefined,
+          repeatDayOfMonth: repeatEnabled && repeatType === 'monthly' ? monthlyDay : undefined,
         };
         onSubmit(eventData);
       }
@@ -461,6 +478,8 @@ export function EventForm({
         repeatType: repeatEnabled ? repeatType : 'none',
         repeatEndDate: repeatEnabled ? repeatEndDate : undefined,
         repeatId,
+        repeatDays: repeatEnabled ? weeklyDays.reduce((acc, day) => acc | (1 << day), 0) : undefined,
+        repeatDayOfMonth: repeatEnabled && repeatType === 'monthly' ? monthlyDay : undefined,
       };
       // 生成重复事件实例
       const repeatInstances = repeatEnabled ? generateRepeatInstances(eventData, repeatEndDate) : [];

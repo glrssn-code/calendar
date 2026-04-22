@@ -5,11 +5,12 @@ import {
   useContext,
   useReducer,
   useEffect,
-  ReactNode,
   useCallback,
+  useRef,
+  ReactNode,
 } from 'react';
 import { CalendarEvent, NewEvent, EventState, EventAction } from '@/types/event';
-import { parseISO } from 'date-fns';
+import { parseISO, format } from 'date-fns';
 import { eventDB } from '@/lib/db';
 import { getSettings } from '@/hooks/useSettings';
 import { backupEventsToLocal, restoreEventsFromLocal } from '@/lib/autoBackup';
@@ -68,6 +69,12 @@ export function EventProvider({ children }: { children: ReactNode }) {
     isLoading: true,
   });
 
+  // 使用 ref 存储最新事件，确保 setTimeout 回调能访问到最新的 events
+  const eventsRef = useRef(state.events);
+  useEffect(() => {
+    eventsRef.current = state.events;
+  }, [state.events]);
+
   // 调度提醒
   const scheduleReminder = useCallback((event: CalendarEvent) => {
     if (!event.reminderEnabled) return;
@@ -84,60 +91,55 @@ export function EventProvider({ children }: { children: ReactNode }) {
     // 计算提醒时间
     const dateTimeStr = `${event.date}T${event.startTime}`;
     if (!event.startTime || dateTimeStr.includes('undefined') || dateTimeStr.includes('null')) {
-      console.log('[scheduleReminder] 跳过，无效时间字符串:', dateTimeStr);
       return; // 无效时间不提醒
     }
 
     const eventTime = parseISO(dateTimeStr).getTime();
     if (isNaN(eventTime)) {
-      console.log('[scheduleReminder] 跳过，eventTime 是 NaN');
       return; // 无效日期不提醒
     }
 
     const reminderTime = eventTime - event.reminderMinutes * 60 * 1000;
     const now = Date.now();
     const delay = reminderTime - now;
-    console.log('[scheduleReminder] 事件:', event.title, '日期:', event.date, '时间:', event.startTime, 'reminderMinutes:', event.reminderMinutes, 'eventTime:', eventTime, 'reminderTime:', reminderTime, 'now:', now, 'delay:', delay);
 
     // 过去的时间不提醒
     if (delay <= 0) {
-      console.log('[scheduleReminder] 跳过，delay <= 0');
       return;
     }
 
     // delay 超过 1 年不设置（防止异常）
     const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
     if (delay > ONE_YEAR_MS) {
-      console.log('[scheduleReminder] 跳过，delay > 1年');
       return;
     }
 
     // JavaScript setTimeout 最大延迟约 24.8 天，超过会立即触发
     const MAX_DELAY = 2147483647;
     if (delay > MAX_DELAY) {
-      console.log('[scheduleReminder] 跳过，delay > MAX_DELAY (24.8天)，实际延迟:', delay);
       return;
     }
 
+    console.log('[set reminder]', event.title, 'date:', event.date, 'time:', event.startTime, 'delay:', Math.round(delay/1000), 's');
     // 设置定时器
-    console.log('[scheduleReminder] 调用 setTimeout，delay:', delay, 'now:', Date.now());
     const timeoutId = setTimeout(() => {
-      console.log('[scheduleReminder] setTimeout 回调执行! 事件:', event.title, '日期:', event.date, '时间:', event.startTime, '延迟了', Date.now() - (reminderTime), 'ms');
+      console.log('[timeout fired]', event.title, 'date:', event.date, 'time:', event.startTime);
 
       // 重新获取当前事件状态，检查是否已完成
-      const currentEvent = state.events.find(e => e.id === event.id);
+      const currentEvent = eventsRef.current.find(e => e.id === event.id);
       if (!currentEvent) {
-        console.log('[scheduleReminder] 事件已不存在，跳过提醒');
+        console.log('[skip] event not found');
         scheduledReminders.delete(event.id);
         return;
       }
       if (currentEvent.completed) {
-        console.log('[scheduleReminder] 事件已标记完成，跳过提醒');
+        console.log('[skip] event completed');
         scheduledReminders.delete(event.id);
         return;
       }
 
       const settings = getSettings();
+      console.log('[triggering]', event.title, 'notifications enabled:', settings.enableDesktopNotifications, 'permission:', Notification.permission);
 
       // 触发浏览器通知
       if (settings.enableDesktopNotifications && Notification.permission === 'granted') {
@@ -167,7 +169,6 @@ export function EventProvider({ children }: { children: ReactNode }) {
           gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
           oscillator.start(audioContext.currentTime);
           oscillator.stop(audioContext.currentTime + 0.5);
-          // 确保 AudioContext 被关闭，防止内存泄漏
           setTimeout(() => audioContext.close(), 600);
         } catch (e) {
           console.warn('Failed to play notification sound:', e);
@@ -178,12 +179,10 @@ export function EventProvider({ children }: { children: ReactNode }) {
     }, delay);
 
     scheduledReminders.set(event.id, timeoutId);
-    console.log('[scheduleReminder] 已设置定时器，事件:', event.title, '将在', new Date(reminderTime).toLocaleString(), '触发，delay:', delay);
   }, []);
 
   // 重新调度所有事件的提醒
   const rescheduleReminders = useCallback(() => {
-    console.log('[rescheduleReminders] 清除所有旧定时器，当前数量:', scheduledReminders.size);
     // 清除所有现有的定时器
     scheduledReminders.forEach((timeoutId) => {
       clearTimeout(timeoutId);
@@ -191,8 +190,10 @@ export function EventProvider({ children }: { children: ReactNode }) {
     scheduledReminders.clear();
 
     // 为所有有提醒且未完成的事件设置定时器
-    console.log('[rescheduleReminders] 设置新定时器，事件总数:', state.events.length);
     const settings = getSettings();
+    const eventsWithReminder = state.events.filter(e => e.reminderEnabled && !e.completed);
+    console.log('[重设提醒] 事件总数:', state.events.length, '| 有提醒的:', eventsWithReminder.length, '| 通知设置:', settings.enableDesktopNotifications, '| 权限:', Notification.permission);
+
     if (Notification.permission === 'granted' || settings.enableDesktopNotifications) {
       state.events.forEach((event) => {
         if (event.reminderEnabled && !event.completed) {
@@ -293,6 +294,13 @@ export function EventProvider({ children }: { children: ReactNode }) {
   }, [state.events]);
 
   const updateEvent = useCallback((event: CalendarEvent) => {
+    // 安全检查：确保事件已存在，避免意外创建新事件
+    const existingEvent = state.events.find(e => e.id === event.id);
+    if (!existingEvent) {
+      console.error('[updateEvent] 事件不存在，无法更新:', event.id, event.title);
+      return;
+    }
+
     // 取消该事件的旧提醒定时器
     const existingTimeout = scheduledReminders.get(event.id);
     if (existingTimeout) {

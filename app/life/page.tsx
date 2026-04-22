@@ -36,6 +36,10 @@ const NOTE_COLORS = [
   { name: 'blue', bg: 'bg-sky-400', border: 'border-sky-500' },
   { name: 'purple', bg: 'bg-violet-400', border: 'border-violet-500' },
   { name: 'pink', bg: 'bg-pink-400', border: 'border-pink-500' },
+  { name: 'red', bg: 'bg-red-400', border: 'border-red-500' },
+  { name: 'orange', bg: 'bg-orange-400', border: 'border-orange-500' },
+  { name: 'cyan', bg: 'bg-cyan-400', border: 'border-cyan-500' },
+  { name: 'indigo', bg: 'bg-indigo-400', border: 'border-indigo-500' },
 ];
 
 function LifeCalendarContent() {

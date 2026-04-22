@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 
 interface TimePickerProps {
@@ -38,22 +38,28 @@ export function TimePicker({ value, onChange, className = '' }: TimePickerProps)
     onChange(`${newHour.toString().padStart(2, '0')}:${newMinute.toString().padStart(2, '0')}`);
   };
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    if (e.deltaY < 0) {
-      // 向上滚动，增加
-      handleMinuteChange(5);
-    } else {
-      // 向下滚动，减少
-      handleMinuteChange(-5);
-    }
-  };
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.deltaY < 0) {
+        handleMinuteChange(5);
+      } else {
+        handleMinuteChange(-5);
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [hour, minute]);
 
   return (
     <div
       ref={containerRef}
       className={`flex items-center gap-1 bg-slate-50 rounded-lg border border-slate-200 p-2 ${className}`}
-      onWheel={handleWheel}
     >
       {/* 小时选择器 */}
       <div className="flex flex-col items-center">

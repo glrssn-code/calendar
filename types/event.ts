@@ -31,6 +31,8 @@ export interface CalendarEvent {
   isAllDay?: boolean; // 是否是全天待办（便签转化来的）
   repeatType: RepeatType; // 重复类型：none/daily/weekly/monthly/yearly
   repeatEndDate?: string; // 重复结束日期 "YYYY-MM-DD"，空表示永不结束
+  repeatDays?: number; // 每周重复时的星期掩码 (bitmask, bit0=周日=1, bit6=周六=64)
+  repeatDayOfMonth?: number; // 每月重复时的日期 (1-31)
   repeatId?: string; // 相同 repeatId 的事件为同一系列重复事件
   createdAt: string;
   sourceNoteId?: string; // 来源便签ID，用于同步
