@@ -167,8 +167,9 @@ export function EventModal({
       }
 
       // 如果是重复事件且提醒设置改变了，显示确认对话框
+      const eventData = events[0] as CalendarEvent;
       if (initialEvent.repeatId) {
-        const eventForCheck = eventData as CalendarEvent;
+        const eventForCheck = eventData;
         if (initialEvent.reminderEnabled !== eventForCheck.reminderEnabled) {
           setPendingReminderUpdate({
             event: initialEvent,
@@ -181,8 +182,9 @@ export function EventModal({
       }
 
       // 如果是重复事件，显示确认对话框（内容修改）
-      if (initialEvent.repeatId) {
-        setPendingEditUpdate(events[0] as CalendarEvent);
+      // 但如果用户关闭了重复开关（eventData 没有 repeatId），则不显示对话框
+      if (initialEvent.repeatId && eventData.repeatId) {
+        setPendingEditUpdate(eventData);
         setShowEditRepeatDialog(true);
         return;
       }
