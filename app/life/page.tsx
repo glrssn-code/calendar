@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { ArrowLeft, ChevronLeft, ChevronRight, Plus, StickyNote, Trash2, Download, Upload, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import { exportLifeCalendarData, importLifeCalendarData, clearLifeCalendarData, getLifeStorageInfo } from '@/lib/lifeStorage';
+import { getLunarDate, getSolarTerm, formatLunarDate } from '@/lib/lunarCalendar';
 import { toast } from 'sonner';
 
 const MIN_CELL_HEIGHT = 120;
@@ -469,6 +470,22 @@ function LifeCalendarContent() {
                       >
                         <Plus className="w-3 h-3" />
                       </button>
+                    </div>
+
+                    {/* 农历 & 节气 */}
+                    <div className="text-[10px] text-amber-500/70 space-y-0.5">
+                      {(() => {
+                        const lunar = getLunarDate(day);
+                        const solarTerm = getSolarTerm(day);
+                        return (
+                          <>
+                            <div className="truncate">{lunar.lunarMonth}月{lunar.lunarDay}</div>
+                            {solarTerm && (
+                              <div className="text-orange-500 font-medium truncate">{solarTerm}</div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {/* 日记预览 */}

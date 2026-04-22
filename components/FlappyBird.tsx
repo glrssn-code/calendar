@@ -27,14 +27,19 @@ interface FlappyBirdProps {
 
 const HIGH_SCORE_KEY = 'flappy_bird_high_score';
 
+interface HighScoreData {
+  score: number;
+  achievedAt: string;
+}
+
 // 从 localStorage 加载最高分
-const loadHighScore = (): number => {
-  if (typeof window === 'undefined') return 0;
+const loadHighScore = (): HighScoreData | null => {
+  if (typeof window === 'undefined') return null;
   try {
     const saved = localStorage.getItem(HIGH_SCORE_KEY);
-    return saved ? parseInt(saved, 10) : 0;
+    return saved ? JSON.parse(saved) : null;
   } catch {
-    return 0;
+    return null;
   }
 };
 
@@ -42,17 +47,22 @@ const loadHighScore = (): number => {
 const saveHighScore = (score: number) => {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(HIGH_SCORE_KEY, score.toString());
+    const data: HighScoreData = { score, achievedAt: new Date().toISOString() };
+    localStorage.setItem(HIGH_SCORE_KEY, JSON.stringify(data));
   } catch {
     // 忽略存储错误
   }
 };
 
+export function getHighScoreData(): HighScoreData | null {
+  return loadHighScore();
+}
+
 export function FlappyBird({ onExit }: FlappyBirdProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameState, setGameState] = useState<'playing' | 'dead' | 'waiting'>('waiting');
   const [score, setScore] = useState(0);
-  const [highScore, setHighScore] = useState(loadHighScore);
+  const [highScore, setHighScore] = useState<HighScoreData | null>(loadHighScore);
   const birdRef = useRef<Bird>({ x: 0, y: 200, vy: 0, rotation: 0 });
   const pipesRef = useRef<Pipe[]>([]);
   const animationRef = useRef<number | undefined>(undefined);
@@ -164,8 +174,8 @@ export function FlappyBird({ onExit }: FlappyBirdProps) {
         if (bird.y > canvas.height - 60 || bird.y < 0) {
           setGameState('dead');
           gameStateRef.current = 'dead';
-          if (scoreRef.current > highScore) {
-            setHighScore(scoreRef.current);
+          if (scoreRef.current > (highScore?.score ?? 0)) {
+            setHighScore({ score: scoreRef.current, achievedAt: new Date().toISOString() });
             saveHighScore(scoreRef.current);
           }
         }
@@ -191,8 +201,8 @@ export function FlappyBird({ onExit }: FlappyBirdProps) {
           ) {
             setGameState('dead');
             gameStateRef.current = 'dead';
-            if (scoreRef.current > highScore) {
-              setHighScore(scoreRef.current);
+            if (scoreRef.current > (highScore?.score ?? 0)) {
+              setHighScore({ score: scoreRef.current, achievedAt: new Date().toISOString() });
               saveHighScore(scoreRef.current);
             }
           }
@@ -299,7 +309,7 @@ export function FlappyBird({ onExit }: FlappyBirdProps) {
 
         ctx.font = 'bold 36px Arial';
         ctx.fillText(`得分: ${scoreRef.current}`, canvas.width / 2, canvas.height / 2 - 20);
-        ctx.fillText(`最高分: ${Math.max(scoreRef.current, highScore)}`, canvas.width / 2, canvas.height / 2 + 30);
+        ctx.fillText(`最高分: ${Math.max(scoreRef.current, highScore?.score ?? 0)}`, canvas.width / 2, canvas.height / 2 + 30);
 
         ctx.font = '24px Arial';
         ctx.fillText('点击屏幕重新开始', canvas.width / 2, canvas.height / 2 + 90);

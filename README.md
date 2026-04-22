@@ -2,7 +2,7 @@
 
 A modern calendar application with rich data visualization and event management features.
 
-![Version](https://img.shields.io/badge/version-1.2.11-blue)
+![Version](https://img.shields.io/badge/version-1.3.0-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20HTML-green)
 ![License](https://img.shields.io/badge/license-MIT-yellow)
 
@@ -25,7 +25,7 @@ Comprehensive data visualization dashboard:
 - Completion rate display (weekly & cumulative)
 - Category distribution (dual pie charts)
 - 4-week trend line chart
-- 24 solar terms heatmap
+- Activity heatmap (weekly patterns)
 - Monthly distribution bar chart
 
 ### Export
@@ -45,19 +45,19 @@ Comprehensive data visualization dashboard:
 
 ### HTML Version
 
-1. Navigate to `releases/v1.2.11/html/`
+1. Navigate to `releases/v1.3.0/html/`
 2. Double-click `start.bat`
 3. Open http://localhost:3000 in your browser
 
 Or use command line:
 ```bash
-cd releases/v1.2.11/html
+cd releases/v1.3.0/html
 npx serve . -p 3000
 ```
 
 ### Desktop App
 
-Navigate to `releases/v1.2.11/win/` and double-click `Calendar.exe`
+Navigate to `releases/v1.3.0/win/` and double-click `Calendar.exe`
 
 ### Development
 

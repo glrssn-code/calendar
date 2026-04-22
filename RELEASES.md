@@ -33,10 +33,10 @@ releases/
    ```bat
    @echo off
    cd /d "%~dp0"
-   start /b npx serve . -p 3000
-   timeout /t 2 /nobreak >nul
+   powershell -WindowStyle Hidden -Command "npx serve . -p 3000"
    start http://localhost:3000
    ```
+   功能：服务器后台静默启动，自动打开浏览器，启动脚本窗口自动关闭
 6. 压缩 win-unpacked 为 zip
 7. 提交所有更改到 git
 

@@ -1,8 +1,9 @@
 import { CalendarEvent } from '@/types/event';
 import { StickyNote } from '@/types/stickyNote';
 import { eventDB, stickyNoteDB } from './db';
+import { getHighScoreData } from '@/components/FlappyBird';
 
-const BACKUP_VERSION = 1;
+const BACKUP_VERSION = 2;
 
 export interface BackupData {
   version: number;
@@ -10,6 +11,10 @@ export interface BackupData {
   stickyNotes: StickyNote[];
   createdAt: string;
   appVersion: string;
+  gameHighScore?: {
+    score: number;
+    achievedAt: string;
+  };
 }
 
 /**
@@ -26,12 +31,15 @@ export async function loadAllData(): Promise<{ events: CalendarEvent[]; stickyNo
  */
 export async function createBackup(): Promise<BackupData> {
   const { events, stickyNotes } = await loadAllData();
+  const highScoreData = getHighScoreData();
+
   return {
     version: BACKUP_VERSION,
     events,
     stickyNotes,
     createdAt: new Date().toISOString(),
-    appVersion: '1.2.5',
+    appVersion: '1.3.0',
+    gameHighScore: highScoreData ?? undefined,
   };
 }
 
@@ -75,6 +83,10 @@ export function parseBackupFile(content: string): { success: boolean; data?: Bac
       data.stickyNotes = [];
     }
 
+    if (!data.gameHighScore) {
+      data.gameHighScore = undefined;
+    }
+
     return { success: true, data };
   } catch {
     return { success: false, error: 'JSON 解析失败' };
@@ -110,6 +122,14 @@ export async function restoreBackupMerge(data: BackupData): Promise<{ eventsImpo
     }
   }
 
+  // 合并游戏最高分（如果备份中有且当前没有）
+  if (data.gameHighScore) {
+    const currentHighScore = getHighScoreData();
+    if (!currentHighScore || data.gameHighScore.score > currentHighScore.score) {
+      localStorage.setItem('flappy_bird_high_score', JSON.stringify(data.gameHighScore));
+    }
+  }
+
   return { eventsImported, notesImported };
 }
 
@@ -128,6 +148,11 @@ export async function restoreBackupReplace(data: BackupData): Promise<{ eventsIm
 
   for (const note of data.stickyNotes) {
     await stickyNoteDB.add(note);
+  }
+
+  // 恢复游戏最高分
+  if (data.gameHighScore) {
+    localStorage.setItem('flappy_bird_high_score', JSON.stringify(data.gameHighScore));
   }
 
   return { eventsImported: data.events.length, notesImported: data.stickyNotes.length };

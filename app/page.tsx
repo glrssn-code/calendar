@@ -23,6 +23,7 @@ import { StickyNoteModal } from '@/components/stickyNote/StickyNoteModal';
 import { HelpModal } from '@/components/HelpModal';
 import { createBackup, downloadBackup, generateBackupFilename } from '@/lib/backup';
 import { StatsPanel } from '@/components/stats/StatsPanel';
+import { useAutoBackupDownload } from '@/hooks/useAutoBackupDownload';
 
 type ViewType = 'day' | 'week' | 'month';
 
@@ -123,6 +124,9 @@ function HomeContent() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showStatsPanel, setShowStatsPanel] = useState(false);
+
+  // 自动下午6点备份
+  useAutoBackupDownload();
 
   // 手动备份处理
   const handleBackup = async () => {

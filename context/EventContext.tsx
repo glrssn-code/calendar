@@ -192,7 +192,8 @@ export function EventProvider({ children }: { children: ReactNode }) {
 
     // 为所有有提醒且未完成的事件设置定时器
     console.log('[rescheduleReminders] 设置新定时器，事件总数:', state.events.length);
-    if (Notification.permission === 'granted') {
+    const settings = getSettings();
+    if (Notification.permission === 'granted' || settings.enableDesktopNotifications) {
       state.events.forEach((event) => {
         if (event.reminderEnabled && !event.completed) {
           scheduleReminder(event);
@@ -251,8 +252,18 @@ export function EventProvider({ children }: { children: ReactNode }) {
 
   // 统一调度提醒：只在事件列表、加载状态或权限变化时触发
   useEffect(() => {
-    if (!state.isLoading && state.events.length > 0 && Notification.permission === 'granted') {
-      rescheduleReminders();
+    if (!state.isLoading && state.events.length > 0) {
+      const settings = getSettings();
+      // 如果设置开启了桌面通知但还没有授权，请求授权
+      if (settings.enableDesktopNotifications && Notification.permission !== 'granted') {
+        Notification.requestPermission().then((permission) => {
+          if (permission === 'granted') {
+            rescheduleReminders();
+          }
+        });
+      } else if (Notification.permission === 'granted') {
+        rescheduleReminders();
+      }
     }
   }, [state.events, state.isLoading, rescheduleReminders]);
 

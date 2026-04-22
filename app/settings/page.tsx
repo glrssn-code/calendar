@@ -262,6 +262,72 @@ export default function SettingsPage() {
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
         {/* Calendar Settings */}
+        <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-cyan-50">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Calendar className="w-5 h-5 text-blue-600" />
+              </div>
+              <h2 className="text-lg font-semibold text-slate-800">日历设置</h2>
+            </div>
+          </div>
+          <div className="p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label className="text-slate-700 font-medium">每周起始日</Label>
+                <Select
+                  value={settings.weekStartsOn}
+                  onValueChange={(v) => saveSettings({ weekStartsOn: v || '0' })}
+                >
+                  <SelectTrigger className="border-slate-200 bg-slate-50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">周日</SelectItem>
+                    <SelectItem value="1">周一</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-slate-700 font-medium">默认事件时长</Label>
+                <Select
+                  value={settings.defaultEventDuration}
+                  onValueChange={(v) => saveSettings({ defaultEventDuration: v || '30' })}
+                >
+                  <SelectTrigger className="border-slate-200 bg-slate-50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15">15 分钟</SelectItem>
+                    <SelectItem value="30">30 分钟</SelectItem>
+                    <SelectItem value="60">1 小时</SelectItem>
+                    <SelectItem value="90">1.5 小时</SelectItem>
+                    <SelectItem value="120">2 小时</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-700 font-medium">默认视图</Label>
+              <Select
+                value={settings.defaultView}
+                onValueChange={(v) => saveSettings({ defaultView: (v || 'week') as 'day' | 'week' | 'month' })}
+              >
+                <SelectTrigger className="border-slate-200 bg-slate-50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">日视图</SelectItem>
+                  <SelectItem value="week">周视图</SelectItem>
+                  <SelectItem value="month">月视图</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </section>
+
         {/* Data Management Section */}
         <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-cyan-50 to-blue-50">
@@ -327,6 +393,43 @@ export default function SettingsPage() {
                   <Download className="w-4 h-4 mr-2" />
                   备份
                 </Button>
+              </div>
+            </div>
+
+            {/* 自动下载备份 */}
+            <div className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-200">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-purple-800">自动下载备份</p>
+                    <p className="text-sm text-purple-600">每天自动下载 JSON 备份文件</p>
+                  </div>
+                  <Switch
+                    checked={settings.autoBackupEnabled}
+                    onCheckedChange={(checked) => saveSettings({ autoBackupEnabled: checked })}
+                    className="data-[checked]:bg-purple-500"
+                  />
+                </div>
+                {settings.autoBackupEnabled && (
+                  <div className="flex items-center gap-3 pt-2">
+                    <Label className="text-sm text-purple-700">备份时间：</Label>
+                    <Select
+                      value={settings.autoBackupHour.toString()}
+                      onValueChange={(value) => value && saveSettings({ autoBackupHour: parseInt(value) })}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 24 }, (_, i) => (
+                          <SelectItem key={i} value={i.toString()}>
+                            {i.toString().padStart(2, '0')}:00
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -415,71 +518,6 @@ export default function SettingsPage() {
                 </Button>
               </div>
             )}
-          </div>
-        </section>
-        <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-cyan-50">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Calendar className="w-5 h-5 text-blue-600" />
-              </div>
-              <h2 className="text-lg font-semibold text-slate-800">日历设置</h2>
-            </div>
-          </div>
-          <div className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label className="text-slate-700 font-medium">每周起始日</Label>
-                <Select
-                  value={settings.weekStartsOn}
-                  onValueChange={(v) => saveSettings({ weekStartsOn: v || '0' })}
-                >
-                  <SelectTrigger className="border-slate-200 bg-slate-50">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">周日</SelectItem>
-                    <SelectItem value="1">周一</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-slate-700 font-medium">默认事件时长</Label>
-                <Select
-                  value={settings.defaultEventDuration}
-                  onValueChange={(v) => saveSettings({ defaultEventDuration: v || '30' })}
-                >
-                  <SelectTrigger className="border-slate-200 bg-slate-50">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="15">15 分钟</SelectItem>
-                    <SelectItem value="30">30 分钟</SelectItem>
-                    <SelectItem value="60">1 小时</SelectItem>
-                    <SelectItem value="90">1.5 小时</SelectItem>
-                    <SelectItem value="120">2 小时</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-slate-700 font-medium">默认视图</Label>
-              <Select
-                value={settings.defaultView}
-                onValueChange={(v) => saveSettings({ defaultView: (v || 'week') as 'day' | 'week' | 'month' })}
-              >
-                <SelectTrigger className="border-slate-200 bg-slate-50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="day">日视图</SelectItem>
-                  <SelectItem value="week">周视图</SelectItem>
-                  <SelectItem value="month">月视图</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         </section>
 

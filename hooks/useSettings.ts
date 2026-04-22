@@ -8,6 +8,8 @@ export interface CalendarSettings {
   enableDesktopNotifications: boolean;
   defaultView: 'day' | 'week' | 'month';
   theme: 'skeuomorphic' | 'cartoon' | 'frostedGlass';
+  autoBackupEnabled: boolean;
+  autoBackupHour: number; // 0-23
 }
 
 const DEFAULT_SETTINGS: CalendarSettings = {
@@ -18,6 +20,8 @@ const DEFAULT_SETTINGS: CalendarSettings = {
   enableDesktopNotifications: true,
   defaultView: 'week',
   theme: 'skeuomorphic',
+  autoBackupEnabled: false,
+  autoBackupHour: 18,
 };
 
 const SETTINGS_KEY = 'calendarSettings';
