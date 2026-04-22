@@ -460,7 +460,7 @@ export function EventForm({
           createdAt: initialEvent.createdAt,
           repeatType: repeatEnabled ? repeatType : 'none',
           repeatEndDate: repeatEnabled ? repeatEndDate : undefined,
-          repeatId: initialEvent.repeatId, // 保持原有的 repeatId
+          repeatId: repeatEnabled ? initialEvent.repeatId : undefined, // 关闭重复时清除 repeatId
           repeatDays: repeatEnabled ? weeklyDays.reduce((acc, day) => acc | (1 << day), 0) : undefined,
           repeatDayOfMonth: repeatEnabled && repeatType === 'monthly' ? monthlyDay : undefined,
         };
