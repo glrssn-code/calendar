@@ -84,14 +84,9 @@ export function EventModal({
     const { event, reminderEnabled, reminderMinutes } = pendingReminderUpdate;
     const repeatId = event.repeatId || pendingEditUpdate?.repeatId;
 
-    console.log('[handleUpdateRepeatReminder] pendingReminderUpdate.event.repeatId:', event.repeatId);
-    console.log('[handleUpdateRepeatReminder] pendingEditUpdate?.repeatId:', pendingEditUpdate?.repeatId);
-    console.log('[handleUpdateRepeatReminder] 最终 repeatId:', repeatId);
-
     if (choice === 'all' && repeatId) {
       // 修改所有重复事件的提醒
       const eventsToUpdate = state.events.filter(e => e.repeatId === repeatId);
-      console.log('[handleUpdateRepeatReminder] 应用所有，state.events 总数:', state.events.length, 'repeatId:', repeatId, '找到事件:', eventsToUpdate.length);
       eventsToUpdate.forEach(e => {
         updateEvent({ ...e, reminderEnabled, reminderMinutes });
       });
@@ -125,7 +120,6 @@ export function EventModal({
     if (choice === 'all' && pendingEditUpdate.repeatId) {
       // 修改所有重复事件的内容，但保留每个事件的原始日期和时间
       const eventsToUpdate = state.events.filter(e => e.repeatId === pendingEditUpdate.repeatId);
-      console.log('[handleUpdateRepeatEvent] 应用所有，当前事件:', pendingEditUpdate.id, '找到要更新的事件:', eventsToUpdate.length);
       eventsToUpdate.forEach(e => {
         // 只更新内容相关的字段，保留每个事件原有的 date, startTime, endTime, createdAt 等
         const updatedEvent: CalendarEvent = {
@@ -140,13 +134,11 @@ export function EventModal({
           // 保留原有的 repeatId（如果需要更新的话）
           repeatId: e.repeatId,
         };
-        console.log('[handleUpdateRepeatEvent] 更新事件:', updatedEvent.id, updatedEvent.title, '原date:', e.date, '新date:', updatedEvent.date);
         updateEvent(updatedEvent);
       });
       toast.success(`已修改所有 ${eventsToUpdate.length} 个重复事件的内容`);
     } else {
       // 只修改当前事件
-      console.log('[handleUpdateRepeatEvent] 只修改当前事件:', pendingEditUpdate.id);
       updateEvent(pendingEditUpdate);
       toast.success('事件已更新');
     }

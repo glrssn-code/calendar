@@ -120,26 +120,20 @@ export function EventProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    console.log('[set reminder]', event.title, 'date:', event.date, 'time:', event.startTime, 'delay:', Math.round(delay/1000), 's');
     // 设置定时器
     const timeoutId = setTimeout(() => {
-      console.log('[timeout fired]', event.title, 'date:', event.date, 'time:', event.startTime);
-
       // 重新获取当前事件状态，检查是否已完成
       const currentEvent = eventsRef.current.find(e => e.id === event.id);
       if (!currentEvent) {
-        console.log('[skip] event not found');
         scheduledReminders.delete(event.id);
         return;
       }
       if (currentEvent.completed) {
-        console.log('[skip] event completed');
         scheduledReminders.delete(event.id);
         return;
       }
 
       const settings = getSettings();
-      console.log('[triggering]', event.title, 'notifications enabled:', settings.enableDesktopNotifications, 'permission:', Notification.permission);
 
       // 触发浏览器通知
       if (settings.enableDesktopNotifications && Notification.permission === 'granted') {
@@ -191,9 +185,6 @@ export function EventProvider({ children }: { children: ReactNode }) {
 
     // 为所有有提醒且未完成的事件设置定时器
     const settings = getSettings();
-    const eventsWithReminder = state.events.filter(e => e.reminderEnabled && !e.completed);
-    console.log('[重设提醒] 事件总数:', state.events.length, '| 有提醒的:', eventsWithReminder.length, '| 通知设置:', settings.enableDesktopNotifications, '| 权限:', Notification.permission);
-
     if (Notification.permission === 'granted' || settings.enableDesktopNotifications) {
       state.events.forEach((event) => {
         if (event.reminderEnabled && !event.completed) {
