@@ -95,7 +95,7 @@ export function EventBlock({ event, onClick, height, theme = 'skeuomorphic', onD
     <div className="relative">
       <button
         ref={buttonRef}
-        className={`absolute left-1 right-1 rounded-lg px-2.5 py-1.5 text-xs text-white overflow-hidden cursor-grab active:cursor-grabbing hover:opacity-85 flex flex-col min-w-0 ${isShortEvent || isNoCategoryEvent ? 'items-center justify-center' : 'items-stretch justify-start'} ${isFrostedGlass ? '' : 'shadow-lg shadow-black/20 ring-1 ring-black/10'} ${colorClass} ${event.isUrgent ? 'ring-2 ring-white/50 animate-pulse' : ''} ${isDragging ? 'opacity-50 cursor-grabbing' : ''}`}
+        className={`absolute left-1 right-1 mb-1 rounded-lg px-2.5 py-1.5 text-xs text-white overflow-hidden cursor-grab active:cursor-grabbing hover:opacity-85 flex flex-col min-w-0 ${isShortEvent || isNoCategoryEvent ? 'items-center justify-center' : 'items-stretch justify-start'} ${isFrostedGlass ? '' : 'shadow-lg shadow-black/20 ring-1 ring-black/10'} ${colorClass} ${event.isUrgent ? 'ring-2 ring-white/50 animate-pulse' : ''} ${isDragging ? 'opacity-50 cursor-grabbing' : ''}`}
         style={{
           top: '0',
           height: height ? `${height}px` : '100%',
