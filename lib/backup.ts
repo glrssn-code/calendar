@@ -38,7 +38,7 @@ export async function createBackup(): Promise<BackupData> {
     events,
     stickyNotes,
     createdAt: new Date().toISOString(),
-    appVersion: '1.3.0',
+    appVersion: '1.3.1',
     gameHighScore: highScoreData ?? undefined,
   };
 }
