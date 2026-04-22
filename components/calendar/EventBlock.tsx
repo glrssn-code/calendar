@@ -95,7 +95,7 @@ export function EventBlock({ event, onClick, height, theme = 'skeuomorphic', onD
     <div className="relative">
       <button
         ref={buttonRef}
-        className={`absolute left-1 right-1 mb-1 rounded-lg px-2.5 py-1.5 text-xs text-white overflow-hidden cursor-grab active:cursor-grabbing hover:opacity-85 flex flex-col min-w-0 ${isShortEvent || isNoCategoryEvent ? 'items-center justify-center' : 'items-stretch justify-start'} ${isFrostedGlass ? '' : 'shadow-lg shadow-black/20 ring-1 ring-black/10'} ${colorClass} ${event.isUrgent ? 'ring-2 ring-white/50 animate-pulse' : ''} ${isDragging ? 'opacity-50 cursor-grabbing' : ''}`}
+        className={`absolute left-1 right-1 mb-0.5 rounded-lg px-2.5 py-1.5 text-xs text-white overflow-hidden cursor-grab active:cursor-grabbing hover:opacity-85 flex flex-col min-w-0 ${isShortEvent || isNoCategoryEvent ? 'items-center justify-center' : 'items-stretch justify-start'} ${isFrostedGlass ? '' : 'shadow-md ring-1 ring-black/10 border-b-2 border-black/20'} ${colorClass} ${event.isUrgent ? 'ring-2 ring-white/50 animate-pulse' : ''} ${isDragging ? 'opacity-50 cursor-grabbing' : ''}`}
         style={{
           top: '0',
           height: height ? `${height}px` : '100%',
@@ -105,9 +105,7 @@ export function EventBlock({ event, onClick, height, theme = 'skeuomorphic', onD
             backdropFilter: 'blur(12px)',
             boxShadow: '0 4px 20px rgba(0,0,0,0.15), inset 0 1px 2px rgba(255,255,255,0.5), inset 0 -1px 2px rgba(0,0,0,0.1)',
             border: '1px solid rgba(255,255,255,0.4)',
-          } : {
-            boxShadow: '0 4px 6px rgba(0,0,0,0.15), inset 0 -2px 0 rgba(0,0,0,0.1)',
-          }),
+          } : {}),
         }}
         onClick={(e) => {
           // 如果发生过拖动，不触发点击
