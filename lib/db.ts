@@ -117,9 +117,10 @@ export const stickyNoteDB = {
   // 批量更新（用于重排序）
   async bulkPut(notes: StickyNote[]): Promise<void> {
     const db = getDB();
+    // 使用 bulkPut (upsert) 而不是 clear + bulkAdd，避免数据丢失风险
+    // bulkPut 会插入或替换已有记录，不会删除不在数组中的记录
     return db.transaction('rw', db.stickyNotes, async () => {
-      await db.stickyNotes.clear();
-      await db.stickyNotes.bulkAdd(notes);
+      await db.stickyNotes.bulkPut(notes);
     });
   },
 };

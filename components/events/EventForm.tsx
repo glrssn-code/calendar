@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { format, addDays, addMonths, parseISO, getDay, getDate, getMonth, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getWeek } from 'date-fns';
+import { format, addDays, addMonths, parseISO, getDay, getDate, getMonth, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getWeek, getDaysInMonth } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -185,8 +185,10 @@ export function EventForm({
           shouldCreate = weeklyDays.length === 0 || weeklyDays.includes(dayOfWeek);
           break;
         case 'monthly':
-          // 每月重复：按选择的日期
-          shouldCreate = getDate(currentDate) === monthlyDay;
+          // 每月重复：按选择的日期，处理边界情况（如31日在2月不存在）
+          const lastDayOfMonth = getDaysInMonth(currentDate);
+          const targetDay = Math.min(monthlyDay, lastDayOfMonth);
+          shouldCreate = getDate(currentDate) === targetDay;
           break;
         case 'yearly':
           // 每年重复：同月同日
@@ -211,6 +213,8 @@ export function EventForm({
           currentDate = addDays(currentDate, 1);
           break;
         case 'weekly':
+          currentDate = addDays(currentDate, 7);
+          break;
         case 'monthly':
           currentDate = addDays(currentDate, 1);
           break;
@@ -401,6 +405,7 @@ export function EventForm({
 
     // 验证重复事件必须有结束日期
     if (repeatEnabled && !repeatEndDate) {
+      toast.error('请设置重复结束日期');
       return;
     }
 
@@ -757,7 +762,7 @@ export function EventForm({
                       min="1"
                       max="31"
                       value={monthlyDay}
-                      onChange={(e) => setMonthlyDay(Number(e.target.value))}
+                      onChange={(e) => setMonthlyDay(Math.min(31, Math.max(1, Number(e.target.value))))}
                       className="w-20 h-8 border-slate-200"
                     />
                     <span className="text-xs text-slate-500">日</span>
