@@ -52,7 +52,7 @@ interface EventContextType {
   state: EventState;
   dispatch: React.Dispatch<EventAction>;
   addEvent: (event: NewEvent) => CalendarEvent;
-  updateEvent: (event: CalendarEvent) => void;
+  updateEvent: (event: CalendarEvent, skipReschedule?: boolean) => void;
   deleteEvent: (id: string) => void;
   getEventsByDate: (date: string) => CalendarEvent[];
   rescheduleReminders: () => void;
@@ -284,7 +284,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
     return newEvent;
   }, [state.events]);
 
-  const updateEvent = useCallback((event: CalendarEvent) => {
+  const updateEvent = useCallback((event: CalendarEvent, skipReschedule = false) => {
     // 安全检查：确保事件已存在，避免意外创建新事件
     const existingEvent = state.events.find(e => e.id === event.id);
     if (!existingEvent) {
@@ -299,8 +299,8 @@ export function EventProvider({ children }: { children: ReactNode }) {
       scheduledReminders.delete(event.id);
     }
 
-    // 如果事件有提醒设置且未完成，重新调度提醒
-    if (event.reminderEnabled && !event.completed) {
+    // 如果事件有提醒设置且未完成，重新调度提醒（除非被跳过）
+    if (!skipReschedule && event.reminderEnabled && !event.completed) {
       scheduleReminder(event);
     }
 

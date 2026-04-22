@@ -33,7 +33,7 @@ export function EventModal({
   defaultUseSmartInput = false,
   defaultDuration = 30,
 }: EventModalProps) {
-  const { addEvent, updateEvent, deleteEvent, state, dispatch } = useEvents();
+  const { addEvent, updateEvent, deleteEvent, state, dispatch, rescheduleReminders } = useEvents();
   const { pushAction } = useUndo();
   const { requestPermission } = useEventReminders();
   const { syncEventCompletionToNote, syncEventColorToNote, syncEventTitleToNote } = useNoteEventSync();
@@ -85,27 +85,18 @@ export function EventModal({
     const repeatId = event.repeatId || pendingEditUpdate?.repeatId;
 
     if (choice === 'all' && repeatId) {
-      // 修改所有重复事件的提醒
+      // 修改所有重复事件的提醒，跳过自动调度，最后统一重设
       const eventsToUpdate = state.events.filter(e => e.repeatId === repeatId);
       eventsToUpdate.forEach(e => {
-        updateEvent({ ...e, reminderEnabled, reminderMinutes });
+        updateEvent({ ...e, reminderEnabled, reminderMinutes }, true);
       });
+      // 统一重设所有提醒
+      rescheduleReminders();
       toast.success(`已修改所有 ${eventsToUpdate.length} 个重复事件的提醒`);
     } else {
-      // 只修改当前事件的提醒 - 但需要取消该事件系列的所有旧定时器
-      // 通过更新事件来触发 rescheduleReminders
-
-      // 先更新当前事件
+      // 只修改当前事件的提醒
       updateEvent({ ...event, reminderEnabled, reminderMinutes });
       toast.success('提醒已修改');
-
-      // 取消其他相同 repeatId 事件的旧定时器（通过重新调度）
-      if (repeatId) {
-        // 触发重新调度，这会清除所有旧定时器并为当前事件设置新的
-        const otherEvents = state.events.filter(e => e.repeatId === repeatId && e.id !== event.id);
-        // 这些其他事件的提醒设置没有改变，但它们的定时器会被清除
-        // 因为 rescheduleReminders 会基于当前 state.events 重新设置所有定时器
-      }
     }
 
     setShowReminderRepeatDialog(false);
