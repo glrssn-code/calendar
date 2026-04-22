@@ -32,10 +32,13 @@ export function DayView({
   const [dragPreview, setDragPreview] = useState<{ top: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  // 过滤后的事件
-  const filteredEvents = filteredEventIds
-    ? events.filter(e => filteredEventIds.has(e.id))
-    : events;
+  // 过滤后的事件 - 按日期过滤
+  const dateKey = format(date, 'yyyy-MM-dd');
+  const filteredEvents = events.filter(e => {
+    if (e.date !== dateKey) return false;
+    if (filteredEventIds && !filteredEventIds.has(e.id)) return false;
+    return true;
+  });
 
   // 按时间分组事件（排除全天待办）
   const getEventsAtHour = (hour: number) => {

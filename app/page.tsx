@@ -22,6 +22,7 @@ import { StickyNotePanel } from '@/components/stickyNote/StickyNotePanel';
 import { StickyNoteModal } from '@/components/stickyNote/StickyNoteModal';
 import { HelpModal } from '@/components/HelpModal';
 import { createBackup, downloadBackup, generateBackupFilename } from '@/lib/backup';
+import { StatsPanel } from '@/components/stats/StatsPanel';
 
 type ViewType = 'day' | 'week' | 'month';
 
@@ -121,6 +122,7 @@ function HomeContent() {
   const [isStickyNoteModalOpen, setIsStickyNoteModalOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showStatsPanel, setShowStatsPanel] = useState(false);
 
   // 手动备份处理
   const handleBackup = async () => {
@@ -436,6 +438,17 @@ function HomeContent() {
           </svg>
         </button>
 
+        {/* 统计按钮 */}
+        <button
+          onClick={() => setShowStatsPanel(true)}
+          className={`h-7 w-7 flex items-center justify-center rounded-lg shadow-sm border transition-none ${theme.navBtn}`}
+          title="数据统计"
+        >
+          <svg className={`w-3.5 h-3.5 ${theme.navBtnText}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        </button>
+
         {/* 统计标签 */}
         {hasActiveFilters && (
           <div className={`h-7 px-2 flex items-center justify-center rounded-lg text-xs font-medium ${theme.statsBadge}`}>
@@ -549,6 +562,12 @@ function HomeContent() {
         initialStartDate={format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd')}
         initialEndDate={format(endOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd')}
         initialCategories={new Set(CATEGORIES)}
+      />
+
+      <StatsPanel
+        isOpen={showStatsPanel}
+        onClose={() => setShowStatsPanel(false)}
+        events={state.events}
       />
     </div>
   );
