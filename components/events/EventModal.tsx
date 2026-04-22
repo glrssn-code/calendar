@@ -140,8 +140,22 @@ export function EventModal({
     onClose();
   };
 
-  const handleSubmit = async (eventData: NewEvent | CalendarEvent | NewEvent[]) => {
-    // 处理重复事件数组
+  const handleSubmit = async (eventData: NewEvent | CalendarEvent | NewEvent[] | { type: 'convert_to_repeat'; events: NewEvent[]; originalEventId: string }) => {
+    // 处理"单一事件转重复"的情况
+    if (!Array.isArray(eventData) && (eventData as any).type === 'convert_to_repeat') {
+      const submitData = eventData as { type: 'convert_to_repeat'; events: NewEvent[]; originalEventId: string };
+      // 删除原始事件
+      deleteEvent(submitData.originalEventId);
+      // 创建所有重复事件
+      for (const event of submitData.events) {
+        addEvent(event);
+      }
+      toast.success(`已将单一事件转换为重复事件，共 ${submitData.events.length} 个`);
+      onClose();
+      return;
+    }
+
+    // 处理普通事件或事件数组
     const events = Array.isArray(eventData) ? eventData : [eventData];
 
     // 如果是编辑已有事件
@@ -154,14 +168,17 @@ export function EventModal({
       }
 
       // 如果是重复事件且提醒设置改变了，显示确认对话框
-      if (initialEvent.repeatId && initialEvent.reminderEnabled !== (eventData as CalendarEvent).reminderEnabled) {
-        setPendingReminderUpdate({
-          event: initialEvent,
-          reminderEnabled: (eventData as CalendarEvent).reminderEnabled,
-          reminderMinutes: (eventData as CalendarEvent).reminderMinutes,
-        });
-        setShowReminderRepeatDialog(true);
-        return;
+      if (initialEvent.repeatId) {
+        const eventForCheck = eventData as CalendarEvent;
+        if (initialEvent.reminderEnabled !== eventForCheck.reminderEnabled) {
+          setPendingReminderUpdate({
+            event: initialEvent,
+            reminderEnabled: eventForCheck.reminderEnabled,
+            reminderMinutes: eventForCheck.reminderMinutes,
+          });
+          setShowReminderRepeatDialog(true);
+          return;
+        }
       }
 
       // 如果是重复事件，显示确认对话框（内容修改）
@@ -171,9 +188,20 @@ export function EventModal({
         return;
       }
 
-      // 普通更新
-      updateEvent(events[0] as CalendarEvent);
-      toast.success('事件已更新');
+      // 如果是单一事件开启重复（传入多个事件），直接删除原事件并创建新的重复事件
+      if (events.length > 1) {
+        // 先删除原事件
+        deleteEvent(initialEvent.id);
+        // 创建所有重复事件
+        for (const event of events) {
+          addEvent(event as NewEvent);
+        }
+        toast.success(`已将单一事件转换为重复事件，共 ${events.length} 个`);
+      } else {
+        // 普通更新
+        updateEvent(events[0] as CalendarEvent);
+        toast.success('事件已更新');
+      }
     } else {
       // 新建事件
       for (const event of events) {
@@ -191,7 +219,7 @@ export function EventModal({
     onClose();
 
     // 处理提醒权限（异步，不阻塞关闭）
-    const eventsWithReminder = events.filter(e => e.reminderEnabled);
+    const eventsWithReminder = (events as CalendarEvent[]).filter(e => e.reminderEnabled);
     if (eventsWithReminder.length > 0) {
       requestPermission().then(hasPermission => {
         if (!hasPermission) {

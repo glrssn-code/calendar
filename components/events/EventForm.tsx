@@ -23,11 +23,18 @@ import { COLOR_CATEGORY_MAP } from '@/lib/constants';
 import { useStickyNotes } from '@/context/StickyNoteContext';
 import { toast } from 'sonner';
 
+// 单一事件转重复的特殊提交类型
+interface ConvertToRepeatSubmit {
+  type: 'convert_to_repeat';
+  events: NewEvent[];
+  originalEventId: string;
+}
+
 interface EventFormProps {
   initialDate?: Date;
   initialHour?: number;
   initialEvent?: CalendarEvent;
-  onSubmit: (event: NewEvent | CalendarEvent | NewEvent[]) => void;
+  onSubmit: (event: NewEvent | CalendarEvent | NewEvent[] | ConvertToRepeatSubmit) => void;
   onCancel: () => void;
   onDelete?: () => void;
   defaultUseSmartInput?: boolean;
@@ -386,26 +393,57 @@ export function EventForm({
     const repeatId = repeatEnabled && repeatType !== 'none' ? crypto.randomUUID() : undefined;
 
     if (initialEvent) {
-      // Editing existing event - just update, don't generate new instances
-      const eventData: CalendarEvent = {
-        id: initialEvent.id,
-        title: title.trim(),
-        description: description.trim(),
-        date,
-        startTime,
-        endTime,
-        reminderEnabled,
-        reminderMinutes,
-        isUrgent,
-        category,
-        color: isUrgent ? 'blue' : CATEGORY_COLORS[category],
-        completed: initialEvent.completed,
-        createdAt: initialEvent.createdAt,
-        repeatType: repeatEnabled ? repeatType : 'none',
-        repeatEndDate: repeatEnabled ? repeatEndDate : undefined,
-        repeatId: initialEvent.repeatId, // 保持原有的 repeatId
-      };
-      onSubmit(eventData);
+      // 如果是从单一事件开启重复，需要生成多个实例
+      if (repeatEnabled && !initialEvent.repeatId) {
+        // 生成新的 repeatId
+        const newRepeatId = crypto.randomUUID();
+        const eventData: NewEvent = {
+          title: title.trim(),
+          description: description.trim(),
+          date,
+          startTime,
+          endTime,
+          reminderEnabled,
+          reminderMinutes,
+          isUrgent,
+          category,
+          color: isUrgent ? 'blue' : CATEGORY_COLORS[category],
+          completed: initialEvent.completed,
+          repeatType: repeatType,
+          repeatEndDate: repeatEndDate,
+          repeatId: newRepeatId,
+        };
+        // 生成重复事件实例
+        const repeatInstances = generateRepeatInstances(eventData, repeatEndDate);
+        // 标记为"单一事件转重复"，传入原始事件ID
+        const submitData: ConvertToRepeatSubmit = {
+          type: 'convert_to_repeat',
+          events: [eventData, ...repeatInstances],
+          originalEventId: initialEvent.id,
+        };
+        onSubmit(submitData);
+      } else {
+        // 保持原有的重复事件更新逻辑
+        const eventData: CalendarEvent = {
+          id: initialEvent.id,
+          title: title.trim(),
+          description: description.trim(),
+          date,
+          startTime,
+          endTime,
+          reminderEnabled,
+          reminderMinutes,
+          isUrgent,
+          category,
+          color: isUrgent ? 'blue' : CATEGORY_COLORS[category],
+          completed: initialEvent.completed,
+          createdAt: initialEvent.createdAt,
+          repeatType: repeatEnabled ? repeatType : 'none',
+          repeatEndDate: repeatEnabled ? repeatEndDate : undefined,
+          repeatId: initialEvent.repeatId, // 保持原有的 repeatId
+        };
+        onSubmit(eventData);
+      }
     } else {
       // Creating new event
       const eventData: NewEvent = {
