@@ -12,9 +12,10 @@ releases/
     │   ├── life.html
     │   ├── settings.html
     │   ├── start.bat  # 启动脚本（启动服务器+打开浏览器）
-    │   └── ...
+    │   ├── stop.bat   # 停止服务器脚本
+    │   └── 使用前请阅读.txt
     └── win/           # Windows EXE 版本
-        ├── Calendar.exe           # 便携版可执行文件
+        ├── win-unpacked/           # 便携版解压目录
         └── Calendar-{version}-win-x64.zip  # 便携版压缩包
 ```
 
@@ -33,12 +34,23 @@ releases/
    ```bat
    @echo off
    cd /d "%~dp0"
-   powershell -WindowStyle Hidden -Command "npx serve . -p 3000"
+   powershell -WindowStyle Hidden -Command "Start-Process cmd -ArgumentList '/c npx --yes serve . -p 3000' -WindowStyle Hidden -PassThru | Out-Null"
+   timeout /t 3 /nobreak >nul
    start http://localhost:3000
+   exit
    ```
-   功能：服务器后台静默启动，自动打开浏览器，启动脚本窗口自动关闭
-6. 压缩 win-unpacked 为 zip
-7. 提交所有更改到 git
+   功能：静默启动服务器（无窗口），等待 3 秒后自动打开浏览器，窗口自动关闭。服务器在后台运行。
+6. 在 html/ 目录下创建 stop.bat：
+   ```bat
+   @echo off
+   taskkill /f /im node.exe 2>nul
+   echo Server stopped.
+   pause
+   ```
+   功能：关闭所有 node 进程（服务器），显示确认信息。
+7. 在 html/ 目录下创建 使用前请阅读.txt（软件简介及使用教程）
+8. 压缩 win-unpacked 为 zip
+9. 提交所有更改到 git
 
 ## 注意事项
 
