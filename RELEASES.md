@@ -21,7 +21,11 @@ releases/
 
 ## 发布流程
 
-1. 修改 `package.json` 中的版本号
+1. 修改所有版本号（确保统一）：
+   - `package.json` 中的 version
+   - `app/settings/page.tsx` 中的版本显示文字
+   - `lib/backup.ts` 中的 appVersion
+   - `README.md` 中的版本路径
 2. 运行 `npm run build` 构建 HTML 版本
 3. 运行 `npm run electron:build` 构建 Electron 版本
 4. 创建发布目录并复制文件：
