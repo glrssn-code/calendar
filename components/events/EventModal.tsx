@@ -8,6 +8,7 @@ import { CalendarEvent, NewEvent } from '@/types/event';
 import { EventForm } from './EventForm';
 import { useEventReminders } from '@/hooks/useEventReminders';
 import { useEvents } from '@/context/EventContext';
+import { useStickyNotes } from '@/context/StickyNoteContext';
 import { useUndo } from '@/context/UndoContext';
 import { eventDB } from '@/lib/db';
 import { toast } from 'sonner';
@@ -34,6 +35,7 @@ export function EventModal({
   defaultDuration = 30,
 }: EventModalProps) {
   const { addEvent, updateEvent, deleteEvent, state, dispatch, rescheduleReminders } = useEvents();
+  const { updateNote, getNoteById } = useStickyNotes();
   const { pushAction } = useUndo();
   const { requestPermission } = useEventReminders();
   const { syncEventCompletionToNote, syncEventColorToNote, syncEventTitleToNote } = useNoteEventSync();
@@ -82,7 +84,7 @@ export function EventModal({
     if (!pendingReminderUpdate) return;
 
     const { event, reminderEnabled, reminderMinutes } = pendingReminderUpdate;
-    const repeatId = event.repeatId || pendingEditUpdate?.repeatId;
+    const repeatId = event.repeatId;
 
     if (choice === 'all' && repeatId) {
       // 修改所有重复事件的提醒，跳过自动调度，最后统一重设
@@ -257,6 +259,20 @@ export function EventModal({
     }
   };
 
+  // 处理事件关联便签
+  const handleLinkNote = (noteId: string) => {
+    if (!initialEvent) return;
+
+    // 更新事件的 sourceNoteId
+    updateEvent({ ...initialEvent, sourceNoteId: noteId });
+
+    // 更新便签的 linkedEventIds，添加此事件
+    const note = getNoteById(noteId);
+    if (note && !note.linkedEventIds.includes(initialEvent.id)) {
+      updateNote({ ...note, linkedEventIds: [...note.linkedEventIds, initialEvent.id] });
+    }
+  };
+
   const getModalTitle = () => {
     if (initialEvent) {
       return '编辑事件';
@@ -281,6 +297,7 @@ export function EventModal({
             onSubmit={handleSubmit}
             onCancel={onClose}
             onDelete={initialEvent ? handleDelete : undefined}
+            onLinkNote={handleLinkNote}
             defaultUseSmartInput={defaultUseSmartInput}
             defaultDuration={defaultDuration}
           />

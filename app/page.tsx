@@ -501,7 +501,7 @@ function HomeContent() {
             onEventClick={handleEditEvent}
             onCreateEvent={handleCreateEvent}
             filteredEventIds={filteredEventIds}
-            weekStartsOn={settings.weekStartsOn === '1' ? 1 : 0}
+            weekStartsOn={0} // 月视图始终以周日为起始
           />
         )}
       </div>

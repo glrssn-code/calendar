@@ -312,7 +312,7 @@ export function StickyNotePanel({ onCreateEvent, filteredNotes, searchQuery }: S
     <>
       {/* 最小化窄条 - 点击切换展开/收起 */}
       <div
-        className="fixed top-1/2 -translate-y-1/2 z-40 flex flex-col items-center cursor-pointer"
+        className="fixed top-1/2 -translate-y-1/2 z-[1000] flex flex-col items-center cursor-pointer"
         style={{
           right: isExpanded ? EXPANDED_WIDTH : 0,
           transition: 'right 0.3s ease',
@@ -343,7 +343,7 @@ export function StickyNotePanel({ onCreateEvent, filteredNotes, searchQuery }: S
 
       {/* 展开面板 - 使用滑动动画 */}
       <div
-        className="fixed top-0 bottom-0 z-40 flex flex-col transition-transform duration-300 ease-in-out"
+        className="fixed top-0 bottom-0 z-[1000] flex flex-col transition-transform duration-300 ease-in-out"
         style={{
           right: 0,
           width: EXPANDED_WIDTH,

@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { TimePicker } from '@/components/ui/time-picker';
+import { MinutePicker } from '@/components/ui/minute-picker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { CalendarEvent, EventColor, NewEvent, CATEGORY_OPTIONS, CATEGORY_COLORS, RepeatType } from '@/types/event';
 import { parseChineseDateTime, formatParsedResult, isValidParsedResult } from '@/lib/nlpParser';
@@ -37,18 +38,10 @@ interface EventFormProps {
   onSubmit: (event: NewEvent | CalendarEvent | NewEvent[] | ConvertToRepeatSubmit) => void;
   onCancel: () => void;
   onDelete?: () => void;
+  onLinkNote?: (noteId: string) => void; // 便签创建后回调，用于更新事件的 sourceNoteId
   defaultUseSmartInput?: boolean;
   defaultDuration?: number;
 }
-
-const REMINDER_OPTIONS = [
-  { value: 0, label: '开始时提醒' },
-  { value: 5, label: '5 分钟前' },
-  { value: 10, label: '10 分钟前' },
-  { value: 15, label: '15 分钟前' },
-  { value: 30, label: '30 分钟前' },
-  { value: 60, label: '1 小时前' },
-];
 
 // 生成时间选项：08:00 - 22:00，每30分钟一格
 const TIME_OPTIONS = [];
@@ -66,6 +59,7 @@ export function EventForm({
   onSubmit,
   onCancel,
   onDelete,
+  onLinkNote,
   defaultUseSmartInput = false,
   defaultDuration = 30,
 }: EventFormProps) {
@@ -75,6 +69,8 @@ export function EventForm({
   const [pendingEvent, setPendingEvent] = useState<NewEvent | null>(null);
   const [showPastTimeDialog, setShowPastTimeDialog] = useState(false);
   const [pastTimeInfo, setPastTimeInfo] = useState<{ today: string; tomorrow: string } | null>(null);
+  // 追踪已关联的便签ID（本地state不同步props变化）
+  const [linkedNoteId, setLinkedNoteId] = useState<string | undefined>(initialEvent?.sourceNoteId);
 
   const [title, setTitle] = useState(initialEvent?.title || '');
   const [description, setDescription] = useState(initialEvent?.description || '');
@@ -82,7 +78,12 @@ export function EventForm({
   const smartInputRef = useRef<HTMLInputElement>(null);
 
   // 便签功能
-  const { addNote } = useStickyNotes();
+  const { addNote, getNoteById } = useStickyNotes();
+
+  // 当 initialEvent 变化时，同步更新 linkedNoteId
+  useEffect(() => {
+    setLinkedNoteId(initialEvent?.sourceNoteId);
+  }, [initialEvent?.sourceNoteId]);
 
   // 自动聚焦到输入框
   useEffect(() => {
@@ -378,16 +379,34 @@ export function EventForm({
       return;
     }
 
+    // 检查是否已经添加过便签，如果便签已被删除则允许重新添加
+    if (linkedNoteId) {
+      const existingNote = getNoteById(linkedNoteId);
+      if (existingNote) {
+        toast.error('此事件已添加过便签');
+        return;
+      }
+      // 便签已删除，清除关联状态
+      setLinkedNoteId(undefined);
+    }
+
     const noteColor = isUrgent ? 'blue' : CATEGORY_COLORS[category];
     const noteCompleted = initialEvent?.completed || false;
 
-    addNote({
+    const newNote = addNote({
       title: title.trim(),
       content: description || `${initialEvent?.date || date} ${initialEvent?.startTime || startTime} - ${initialEvent?.endTime || endTime}\n分类: ${category}`,
       color: noteColor,
       isUrgent: isUrgent,
       completed: noteCompleted,
     });
+
+    // 通知外部更新事件的 sourceNoteId，并更新本地state
+    if (newNote.id && onLinkNote) {
+      onLinkNote(newNote.id);
+      setLinkedNoteId(newNote.id);
+    }
+
     toast.success('已添加到便签');
   };
 
@@ -801,21 +820,15 @@ export function EventForm({
           {reminderEnabled && (
             <div className="space-y-1.5">
               <Label className="text-slate-700 font-medium text-xs">提前提醒时间</Label>
-              <Select
-                value={reminderMinutes.toString()}
-                onValueChange={(v) => setReminderMinutes(Number(v))}
-              >
-                <SelectTrigger className="border-slate-200 focus:border-blue-400 h-8 text-sm">
-                  <SelectValue placeholder="选择提前提醒时间" />
-                </SelectTrigger>
-                <SelectContent>
-                  {REMINDER_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value.toString()}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <MinutePicker
+                  value={reminderMinutes}
+                  onChange={setReminderMinutes}
+                />
+                {reminderMinutes === 0 && (
+                  <span className="text-xs text-slate-500">(开始时提醒)</span>
+                )}
+              </div>
             </div>
           )}
 

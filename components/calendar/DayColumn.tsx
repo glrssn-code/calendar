@@ -318,6 +318,11 @@ export function DayColumn({
     ? { top: stickyNoteDragState.top, hour: stickyNoteDragState.hour, minute: stickyNoteDragState.minute }
     : null;
 
+  // 计算事件布局 - 在组件级别使用 useMemo，避免每次渲染重新计算
+  const timedEvents = events.filter(e => !e.isAllDay && e.startTime && e.endTime);
+  const layout = useMemo(() => calculateEventLayout(timedEvents), [timedEvents]);
+  const MIN_HEIGHT = HOUR_HEIGHT / 2;
+
   return (
     <div
       className={`flex-1 min-w-0 border-r ${
@@ -393,12 +398,7 @@ export function DayColumn({
           className="absolute inset-0 pointer-events-none"
           style={{ height: `${15 * HOUR_HEIGHT}px` }}
         >
-          {(() => {
-            const timedEvents = events.filter(e => !e.isAllDay && e.startTime && e.endTime);
-            const layout = useMemo(() => calculateEventLayout(timedEvents), [timedEvents]);
-            const MIN_HEIGHT = HOUR_HEIGHT / 2;
-
-            return timedEvents.map((event) => {
+          {timedEvents.map((event) => {
               const [startH, startM] = event.startTime!.split(':').map(Number);
               const [endH, endM] = event.endTime!.split(':').map(Number);
               const startMinutes = (startH - 8) * 60 + startM;
@@ -417,6 +417,12 @@ export function DayColumn({
               // 检查是否是正在拖动的事件
               const isDragging = draggingEventId === event.id;
 
+              // 动态 z-index：上面的事件有更高的 z-index，确保在上方的事件的阴影能显示在下方事件的背景上
+              // 使用更细的粒度 (10px) 确保不同位置的事件有不同 z-index
+              const zIndexBase = 20;
+              const zIndexOffset = Math.floor((2000 - top) / 10); // top 越小，z-index 越高
+              const eventZIndex = isDragging ? 1000 : zIndexBase + zIndexOffset;
+
               return (
                 <div
                   key={event.id}
@@ -426,7 +432,7 @@ export function DayColumn({
                     height: `${height}px`,
                     left: `${left}%`,
                     width: `${width}%`,
-                    zIndex: isDragging ? 20 : 10,
+                    zIndex: eventZIndex,
                     opacity: isDragging ? 0.5 : 1,
                   }}
                 >
@@ -449,8 +455,7 @@ export function DayColumn({
                   />
                 </div>
               );
-            });
-          })()}
+            })}
 
           {/* 跨天拖动预览 - 显示在目标列 */}
           {externalDraggingEvent && externalDragPreview && isThisColumnBeingDraggedTo && externalDraggingEvent.startTime && externalDraggingEvent.endTime && (
@@ -516,8 +521,8 @@ export function DayColumn({
 
         {isToday && currentTimePosition >= 0 && (
           <div
-            className="absolute left-0 right-0 h-0.5 current-time-line z-20 pointer-events-none"
-            style={{ top: `${currentTimePosition}px` }}
+            className="absolute left-0 right-0 h-0.5 current-time-line pointer-events-none"
+            style={{ top: `${currentTimePosition}px`, zIndex: 500 }}
           />
         )}
       </div>
