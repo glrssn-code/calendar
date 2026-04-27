@@ -332,7 +332,7 @@ export function EventForm({
       startTime: format(result.date, 'HH:mm'),
       endTime: format(endDate, 'HH:mm'),
       reminderEnabled, // 使用用户设置的提醒选项
-      reminderMinutes: reminderEnabled ? 0 : 0, // 开始时提醒
+      reminderMinutes: reminderEnabled ? reminderMinutes : 0, // 开始时提醒
       isUrgent: result.isUrgent,
       category: smartCategory,
       color: result.isUrgent ? 'blue' : CATEGORY_COLORS[smartCategory],
@@ -617,19 +617,20 @@ export function EventForm({
       ) : (
         /* 普通输入模式 */
         <>
+          <div className="space-y-1.5">
+            <Label htmlFor="title" className="text-slate-700 font-medium text-sm">事件标题</Label>
+            <Input
+              ref={titleInputRef}
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="输入事件标题"
+              className="border-slate-200 focus:border-blue-400 h-9"
+              required
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="title" className="text-slate-700 font-medium text-sm">事件标题</Label>
-              <Input
-                ref={titleInputRef}
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="输入事件标题"
-                className="border-slate-200 focus:border-blue-400 h-9"
-                required
-              />
-            </div>
             <div className="space-y-1.5">
               <Label htmlFor="date" className="text-slate-700 font-medium text-sm">日期</Label>
               <Input
@@ -641,17 +642,16 @@ export function EventForm({
                 required
               />
             </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="description" className="text-slate-700 font-medium text-sm">事件内容</Label>
-            <textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="输入事件内容（可选）"
-              className="w-full min-h-[50px] px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/20 focus:border-blue-400 resize-none"
-            />
+            <div className="space-y-1.5">
+              <Label htmlFor="description" className="text-slate-700 font-medium text-sm">事件内容</Label>
+              <textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="输入事件内容（可选）"
+                className="w-full h-9 px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/20 focus:border-blue-400 resize-none"
+              />
+            </div>
           </div>
 
           {/* 提醒 + 紧急事件 + 重复 放一行 */}

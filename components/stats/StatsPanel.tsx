@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { CalendarEvent } from '@/types/event';
 import { CATEGORIES } from '@/types/event';
+import { COLOR_CATEGORY_MAP, CATEGORY_COLORS } from '@/lib/constants';
 import { format, startOfWeek, endOfWeek, subWeeks, isWithinInterval, getDay, parseISO, eachDayOfInterval, subMonths, getMonth } from 'date-fns';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { TrendingUp, TrendingDown, CheckCircle2, AlertCircle, Calendar, Target, Clock, CalendarDays, Zap, Activity, PieChart as PieChartIcon, Flame, Timer } from 'lucide-react';
@@ -244,21 +245,12 @@ export function StatsPanel({ isOpen, onClose, events }: StatsPanelProps) {
       return true;
     });
 
-    // 各类别统计
-    const categoryColors: Record<string, string> = {
-      '售前': '#3b82f6',
-      '项目': '#22c55e',
-      '会议': '#f59e0b',
-      '管理': '#8b5cf6',
-      '推广': '#ec4899',
-      '其它': '#6b7280',
-    };
-
+    // 各类别统计 - 使用 constants.ts 中的统一颜色
     const categoryStats = CATEGORIES.map(cat => ({
       name: cat,
       value: uniqueEvents.filter(e => e.category === cat).length,
       completed: uniqueEvents.filter(e => e.category === cat && e.completed).length,
-      color: categoryColors[cat] || '#6b7280',
+      color: COLOR_CATEGORY_MAP[CATEGORY_COLORS[cat]]?.hex || '#6b7280',
     })).filter(s => s.value > 0).sort((a, b) => b.value - a.value);
 
     // 完成/未完成饼图
@@ -273,12 +265,12 @@ export function StatsPanel({ isOpen, onClose, events }: StatsPanelProps) {
     const thisWeekScheduledCompleted = thisWeekScheduled.filter(e => e.completed).length;
     const thisWeekNewCreated = thisWeekScheduled.length; // 本周新建的事件数
 
-    // 本周类别统计
+    // 本周类别统计 - 使用 constants.ts 中的统一颜色
     const thisWeekCategoryStats = CATEGORIES.map(cat => ({
       name: cat,
       value: thisWeekScheduled.filter(e => e.category === cat).length,
       completed: thisWeekScheduled.filter(e => e.category === cat && e.completed).length,
-      color: categoryColors[cat] || '#6b7280',
+      color: COLOR_CATEGORY_MAP[CATEGORY_COLORS[cat]]?.hex || '#6b7280',
     })).filter(s => s.value > 0).sort((a, b) => b.value - a.value);
 
     // 上周计划事件

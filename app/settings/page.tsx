@@ -35,11 +35,11 @@ export default function SettingsPage() {
   const developerClickCountRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showBackupDialog, setShowBackupDialog] = useState(false);
-  const [backupPreview, setBackupPreview] = useState<{ eventCount: number; noteCount: number } | null>(null);
-  const [importBackupPreview, setImportBackupPreview] = useState<{ data: any; eventCount: number; noteCount: number } | null>(null);
+  const [backupPreview, setBackupPreview] = useState<{ eventCount: number; noteCount: number; diaryCount: number; lifeNoteCount: number } | null>(null);
+  const [importBackupPreview, setImportBackupPreview] = useState<{ data: any; eventCount: number; noteCount: number; diaryCount: number; lifeNoteCount: number } | null>(null);
   const [importBackupError, setImportBackupError] = useState<string | null>(null);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
-  const [localBackupInfo, setLocalBackupInfo] = useState<{ hasBackup: boolean; eventCount: number; noteCount: number; lastSync: string | null }>({ hasBackup: false, eventCount: 0, noteCount: 0, lastSync: null });
+  const [localBackupInfo, setLocalBackupInfo] = useState<{ hasBackup: boolean; eventCount: number; noteCount: number; diaryCount: number; lifeNoteCount: number; lastSync: string | null }>({ hasBackup: false, eventCount: 0, noteCount: 0, diaryCount: 0, lifeNoteCount: 0, lastSync: null });
 
   // 刷新存储信息
   const refreshStorageInfo = async () => {
@@ -167,6 +167,8 @@ export default function SettingsPage() {
             data: result.data,
             eventCount: result.data.events.length,
             noteCount: result.data.stickyNotes.length,
+            diaryCount: result.data.diaries?.length || 0,
+            lifeNoteCount: result.data.lifeNotes?.length || 0,
           });
           setImportBackupError(null);
           setShowBackupDialog(true);
@@ -191,7 +193,7 @@ export default function SettingsPage() {
     setShowBackupDialog(false);
     setImportBackupPreview(null);
     refreshStorageInfoWithNotes();
-    alert(`成功导入 ${result.eventsImported} 个事件和 ${result.notesImported} 个便签`);
+    alert(`成功导入 ${result.eventsImported} 个事件、${result.notesImported} 个便签、${result.diariesImported} 篇日记和 ${result.lifeNotesImported} 个生活便签`);
   };
 
   // 执行备份导入 - 替换
@@ -201,7 +203,7 @@ export default function SettingsPage() {
     setShowBackupDialog(false);
     setImportBackupPreview(null);
     refreshStorageInfoWithNotes();
-    alert(`成功替换为 ${result.eventsImported} 个事件和 ${result.notesImported} 个便签`);
+    alert(`成功替换为 ${result.eventsImported} 个事件、${result.notesImported} 个便签、${result.diariesImported} 篇日记和 ${result.lifeNotesImported} 个生活便签`);
   };
 
   // 更新存储信息，显示便签数量
@@ -215,20 +217,22 @@ export default function SettingsPage() {
       storageSize: info.storageSize,
     });
     setLocalBackupInfo({
-      hasBackup: localStats.eventCount > 0 || localStats.noteCount > 0,
+      hasBackup: localStats.eventCount > 0 || localStats.noteCount > 0 || localStats.diaryCount > 0 || localStats.lifeNoteCount > 0,
       eventCount: localStats.eventCount,
       noteCount: localStats.noteCount,
+      diaryCount: localStats.diaryCount,
+      lifeNoteCount: localStats.lifeNoteCount,
       lastSync: localStats.lastSync,
     });
   };
 
   // 从本地备份恢复
   const handleRestoreFromLocal = async () => {
-    if (!confirm(`本地备份包含 ${localBackupInfo.eventCount} 个事件和 ${localBackupInfo.noteCount} 个便签，是否恢复？`)) {
+    if (!confirm(`本地备份包含 ${localBackupInfo.eventCount} 个事件、${localBackupInfo.noteCount} 个便签、${localBackupInfo.diaryCount} 篇日记和 ${localBackupInfo.lifeNoteCount} 个生活便签，是否恢复？`)) {
       return;
     }
     const result = await restoreLocalBackupToIndexedDB();
-    alert(`成功从本地备份恢复 ${result.eventsRestored} 个事件和 ${result.notesRestored} 个便签`);
+    alert(`成功从本地备份恢复 ${result.eventsRestored} 个事件、${result.notesRestored} 个便签、${result.diariesRestored} 篇日记和 ${result.lifeNotesRestored} 个生活便签`);
     refreshStorageInfoWithNotes();
     // 刷新页面以加载恢复的数据
     window.location.reload();
@@ -463,7 +467,7 @@ export default function SettingsPage() {
                   <div>
                     <p className="font-medium text-amber-800">本地自动备份</p>
                     <p className="text-sm text-amber-600">
-                      {localBackupInfo.eventCount} 个事件，{localBackupInfo.noteCount} 个便签
+                      {localBackupInfo.eventCount} 个事件、{localBackupInfo.noteCount} 个便签、{localBackupInfo.diaryCount} 篇日记、{localBackupInfo.lifeNoteCount} 个生活便签
                     </p>
                     {localBackupInfo.lastSync && (
                       <p className="text-xs text-amber-500 mt-1">
@@ -744,7 +748,7 @@ export default function SettingsPage() {
           <DialogHeader>
             <DialogTitle>恢复备份</DialogTitle>
             <DialogDescription>
-              备份包含 {importBackupPreview?.eventCount || 0} 个事件和 {importBackupPreview?.noteCount || 0} 个便签，请选择恢复方式：
+              备份包含 {importBackupPreview?.eventCount || 0} 个事件、{importBackupPreview?.noteCount || 0} 个便签、{importBackupPreview?.diaryCount || 0} 篇日记、{importBackupPreview?.lifeNoteCount || 0} 个生活便签，请选择恢复方式：
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">

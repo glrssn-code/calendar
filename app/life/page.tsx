@@ -747,6 +747,11 @@ function LifeCalendarContent() {
               <Input
                 value={noteTitle}
                 onChange={(e) => setNoteTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && noteTitle.trim()) {
+                    handleSaveNote();
+                  }
+                }}
                 placeholder="便签标题"
                 className="border-amber-200 focus:border-amber-500"
               />

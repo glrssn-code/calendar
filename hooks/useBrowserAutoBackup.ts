@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
-import { backupEventsToLocal, backupNotesToLocal, getLastSyncTime } from '@/lib/autoBackup';
+import { backupEventsToLocal, backupNotesToLocal, backupDiariesToLocal, backupLifeNotesToLocal, getLastSyncTime } from '@/lib/autoBackup';
 
 /**
  * 检查是否需要显示备份提醒
@@ -32,16 +32,23 @@ export function useBrowserAutoBackup() {
   const performBackup = useCallback(async () => {
     try {
       const { eventDB, stickyNoteDB } = await import('@/lib/db');
+      const { lifeCalendarDB } = await import('@/lib/lifeStorage');
 
       // 从 IndexedDB 获取所有数据
-      const events = await eventDB.getAll();
-      const notes = await stickyNoteDB.getAll();
+      const [events, notes, diaries, lifeNotes] = await Promise.all([
+        eventDB.getAll(),
+        stickyNoteDB.getAll(),
+        lifeCalendarDB.diaries.toArray(),
+        lifeCalendarDB.notes.toArray(),
+      ]);
 
       // 备份到 localStorage
       backupEventsToLocal(events);
       backupNotesToLocal(notes);
+      backupDiariesToLocal(diaries);
+      backupLifeNotesToLocal(lifeNotes);
 
-      return { eventsCount: events.length, notesCount: notes.length };
+      return { eventsCount: events.length, notesCount: notes.length, diaryCount: diaries.length, lifeNoteCount: lifeNotes.length };
     } catch (error) {
       console.error('[BrowserAutoBackup] backup failed:', error);
       return null;
@@ -61,7 +68,7 @@ export function useBrowserAutoBackup() {
         onClick: async () => {
           const result = await performBackup();
           if (result) {
-            toast.success(`已备份 ${result.eventsCount} 个事件和 ${result.notesCount} 个便签`);
+            toast.success(`已备份 ${result.eventsCount} 个事件、${result.notesCount} 个便签、${result.diaryCount} 篇日记、${result.lifeNoteCount} 个生活便签`);
           } else {
             toast.error('备份失败，请重试');
           }
