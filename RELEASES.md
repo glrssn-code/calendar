@@ -38,12 +38,13 @@ releases/
    ```bat
    @echo off
    cd /d "%~dp0"
-   powershell -WindowStyle Hidden -Command "Start-Process cmd -ArgumentList '/c npx --yes serve . -p 3000' -WindowStyle Hidden -PassThru | Out-Null"
-   timeout /t 3 /nobreak >nul
+   echo Installing serve if needed (first run may take a minute)...
+   start cmd /k "npx --yes serve . -p 3000"
+   timeout /t 8 /nobreak >nul
    start http://localhost:3000
    exit
    ```
-   功能：静默启动服务器（无窗口），等待 3 秒后自动打开浏览器，窗口自动关闭。服务器在后台运行。
+   功能：启动服务器窗口（首次运行需下载 npx 包，可能需要等待），等待 8 秒后自动打开浏览器。关闭 start.bat 窗口后服务器继续运行。
 6. 在 html/ 目录下创建 stop.bat：
    ```bat
    @echo off
