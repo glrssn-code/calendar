@@ -276,6 +276,7 @@ function LifeCalendarContent() {
   const handleUnlinkNote = async (noteId: string) => {
     await updateNote(noteId, { linkedDate: undefined });
     toast.success('便签已取消关联');
+    setShowNoteDialog(false);
     loadStorageInfo();
   };
 
@@ -596,11 +597,6 @@ function LifeCalendarContent() {
                       e.stopPropagation();
                       openEditNote(note);
                     }}
-                    onMouseEnter={(e) => {
-                      const rect = (e.target as HTMLElement).getBoundingClientRect();
-                      setNoteTooltip({ note, x: rect.right, y: rect.top });
-                    }}
-                    onMouseLeave={() => setNoteTooltip(null)}
                     className={`p-3 rounded-lg ${colorClass.bg} border-l-4 ${colorClass.border} cursor-pointer hover:opacity-90 transition-opacity ${note.completed ? 'opacity-60' : ''}`}
                   >
                     <div className="flex items-center gap-2">

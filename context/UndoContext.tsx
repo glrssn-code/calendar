@@ -36,10 +36,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
       // Ctrl+Z 或 Cmd+Z (Mac)
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
-        const undone = undoInternal();
-        if (undone) {
-          // 可以添加视觉反馈，比如 toast
-        }
+        undoInternal();
       }
     };
 

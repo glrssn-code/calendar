@@ -78,6 +78,8 @@ export function LifeCalendarProvider({ children }: { children: React.ReactNode }
             mood: diaryToDelete.mood,
             weather: diaryToDelete.weather,
           });
+          // 撤销后刷新数据以更新 UI
+          await refreshData();
         },
       });
     }
@@ -86,7 +88,7 @@ export function LifeCalendarProvider({ children }: { children: React.ReactNode }
       ...prev,
       diaries: prev.diaries.filter(d => d.id !== id),
     }));
-  }, [state.diaries, pushAction]);
+  }, [state.diaries, pushAction, refreshData]);
 
   const handleAddNote = useCallback(async (note: Omit<LifeNote, 'id' | 'createdAt'>) => {
     const newNote = await addNote(note);
@@ -121,6 +123,8 @@ export function LifeCalendarProvider({ children }: { children: React.ReactNode }
             completed: noteToDelete.completed,
             linkedDate: noteToDelete.linkedDate,
           });
+          // 撤销后刷新数据以更新 UI
+          await refreshData();
         },
       });
     }
@@ -129,7 +133,7 @@ export function LifeCalendarProvider({ children }: { children: React.ReactNode }
       ...prev,
       notes: prev.notes.filter(n => n.id !== id),
     }));
-  }, [state.notes, pushAction]);
+  }, [state.notes, pushAction, refreshData]);
 
   const handleGetDiariesByDate = useCallback(async (date: string) => {
     return getDiariesByDate(date);
