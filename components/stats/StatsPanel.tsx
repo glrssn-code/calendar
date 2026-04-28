@@ -76,8 +76,10 @@ function PieChart({ data, size = 80 }: { data: { name: string; value: number; co
 // 折线图组件
 function LineChart({ data, width = 280, height = 80 }: { data: { label: string; value: number }[]; width?: number; height?: number }) {
   const max = Math.max(...data.map(d => d.value), 1);
+  // 避免 data.length 为 1 时除以 0 导致 NaN
+  const xStep = data.length > 1 ? width / (data.length - 1) : 0;
   const points = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * width;
+    const x = xStep * i;
     const y = height - (d.value / max) * height;
     return `${x},${y}`;
   }).join(' ');
@@ -115,7 +117,7 @@ function LineChart({ data, width = 280, height = 80 }: { data: { label: string; 
       />
       {/* 数据点 */}
       {data.map((d, i) => {
-        const x = (i / (data.length - 1)) * width;
+        const x = xStep * i;
         const y = height - (d.value / max) * height;
         return (
           <g key={i}>

@@ -37,7 +37,13 @@ const loadHighScore = (): HighScoreData | null => {
   if (typeof window === 'undefined') return null;
   try {
     const saved = localStorage.getItem(HIGH_SCORE_KEY);
-    return saved ? JSON.parse(saved) : null;
+    if (!saved) return null;
+    const data = JSON.parse(saved);
+    // 验证数据结构完整性
+    if (typeof data.score !== 'number' || typeof data.achievedAt !== 'string') {
+      return null;
+    }
+    return data;
   } catch {
     return null;
   }

@@ -77,6 +77,13 @@ export function useBrowserAutoBackup() {
     });
   }, [performBackup]);
 
+  // 重置提醒状态（当距离上次备份超过30分钟时）
+  const resetReminderState = useCallback(() => {
+    if (shouldShowBackupReminder()) {
+      reminderShownRef.current = false;
+    }
+  }, []);
+
   useEffect(() => {
     // 仅在浏览器环境执行
     if (typeof window === 'undefined') return;
@@ -91,6 +98,9 @@ export function useBrowserAutoBackup() {
       // 检查是否需要显示备份提醒
       if (shouldShowBackupReminder()) {
         showBackupReminder();
+      } else {
+        // 超过30分钟没备份，重置提醒状态
+        resetReminderState();
       }
     }, 5 * 60 * 1000); // 5分钟
 
@@ -99,7 +109,7 @@ export function useBrowserAutoBackup() {
         clearInterval(backupIntervalRef.current);
       }
     };
-  }, [performBackup, showBackupReminder]);
+  }, [performBackup, showBackupReminder, resetReminderState]);
 
   return { performBackup };
 }
