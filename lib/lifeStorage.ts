@@ -20,6 +20,7 @@ export interface LifeNote {
   createdAt: string;
   linkedDate?: string; // 关联的日期 "YYYY-MM-DD"
   position?: { x: number; y: number };
+  sortOrder: number; // 用于便签排序
 }
 
 class LifeCalendarDB extends Dexie {
@@ -31,6 +32,17 @@ class LifeCalendarDB extends Dexie {
     this.version(1).stores({
       diaries: 'id, date, createdAt',
       notes: 'id, createdAt, linkedDate',
+    });
+    this.version(2).stores({
+      diaries: 'id, date, createdAt',
+      notes: 'id, createdAt, linkedDate, sortOrder',
+    }).upgrade(tx => {
+      // 旧版本数据 sortOrder 默认为 0
+      return tx.table('notes').toCollection().modify(note => {
+        if (note.sortOrder === undefined) {
+          note.sortOrder = 0;
+        }
+      });
     });
   }
 }
@@ -79,13 +91,17 @@ export async function getAllDiariesWithStats() {
 }
 
 // 便签操作
-export async function addNote(note: Omit<LifeNote, 'id' | 'createdAt'>): Promise<LifeNote> {
+export async function addNote(note: Omit<LifeNote, 'id' | 'createdAt' | 'sortOrder'>): Promise<LifeNote> {
   const id = `note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const now = new Date().toISOString();
+  // 计算新的 sortOrder（未关联的便签放最后）
+  const existingNotes = await lifeCalendarDB.notes.toArray();
+  const maxSortOrder = existingNotes.reduce((max, n) => Math.max(max, n.sortOrder || 0), -1);
   const newNote: LifeNote = {
     ...note,
     id,
     createdAt: now,
+    sortOrder: maxSortOrder + 1,
   };
   await lifeCalendarDB.notes.add(newNote);
   return newNote;
@@ -100,7 +116,8 @@ export async function deleteNote(id: string): Promise<void> {
 }
 
 export async function getNotes(): Promise<LifeNote[]> {
-  return lifeCalendarDB.notes.toArray();
+  const notes = await lifeCalendarDB.notes.toArray();
+  return notes.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 }
 
 export async function getNotesByDate(date: string): Promise<LifeNote[]> {
@@ -113,6 +130,15 @@ export async function getAllNotesWithStats() {
     noteCount: notes.length,
     notes,
   };
+}
+
+// 批量更新便签排序
+export async function reorderNotes(noteIds: string[]): Promise<void> {
+  await Promise.all(
+    noteIds.map((id, index) =>
+      lifeCalendarDB.notes.update(id, { sortOrder: index })
+    )
+  );
 }
 
 // 导出生活日历数据

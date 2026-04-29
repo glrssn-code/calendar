@@ -632,6 +632,16 @@ export function EventForm({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
+              <Label htmlFor="description" className="text-slate-700 font-medium text-sm">事件内容</Label>
+              <textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="输入事件内容（可选）"
+                className="w-full h-9 px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/20 focus:border-blue-400 resize-none"
+              />
+            </div>
+            <div className="space-y-1.5">
               <Label htmlFor="date" className="text-slate-700 font-medium text-sm">日期</Label>
               <Input
                 id="date"
@@ -640,16 +650,6 @@ export function EventForm({
                 onChange={(e) => setDate(e.target.value)}
                 className="border-slate-200 focus:border-blue-400 h-9"
                 required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="description" className="text-slate-700 font-medium text-sm">事件内容</Label>
-              <textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="输入事件内容（可选）"
-                className="w-full h-9 px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/20 focus:border-blue-400 resize-none"
               />
             </div>
           </div>

@@ -43,7 +43,7 @@ const NOTE_COLORS = [
 ];
 
 function LifeCalendarContent() {
-  const { diaries, notes, addDiary, updateDiary, deleteDiary, addNote, updateNote, deleteNote, refreshData } = useLifeCalendar();
+  const { diaries, notes, addDiary, updateDiary, deleteDiary, addNote, updateNote, deleteNote, reorderNotes, refreshData } = useLifeCalendar();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showDiaryDialog, setShowDiaryDialog] = useState(false);
@@ -53,6 +53,8 @@ function LifeCalendarContent() {
   const [editingNote, setEditingNote] = useState<LifeNote | null>(null);
   const [draggedNote, setDraggedNote] = useState<LifeNote | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+  const [dragInsertIndex, setDragInsertIndex] = useState<number | null>(null);
+  const notesContainerRef = useRef<HTMLDivElement>(null);
 
   // 日记表单状态
   const [diaryContent, setDiaryContent] = useState('');
@@ -249,6 +251,56 @@ function LifeCalendarContent() {
   const handleNoteDragEnd = () => {
     setDraggedNote(null);
     setDragOverDate(null);
+    setDragInsertIndex(null);
+  };
+
+  // 便签容器拖拽处理 - 计算插入位置
+  const handleNotesContainerDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!draggedNote || !notesContainerRef.current) return;
+
+    const container = notesContainerRef.current;
+    const containerRect = container.getBoundingClientRect();
+    const mouseY = e.clientY - containerRect.top;
+
+    // 获取所有便签元素
+    const noteElements = container.querySelectorAll('[data-note-id]');
+    let insertIndex = 0;
+
+    noteElements.forEach((el, index) => {
+      const rect = el.getBoundingClientRect();
+      const noteMiddle = rect.top + rect.height / 2 - containerRect.top;
+      if (mouseY > noteMiddle) {
+        insertIndex = index + 1;
+      }
+    });
+
+    setDragInsertIndex(insertIndex);
+  };
+
+  const handleNotesContainerDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!draggedNote) return;
+
+    // 计算新的顺序
+    const noteIds = unlinkedNotes.map(n => n.id);
+    const draggedIndex = noteIds.indexOf(draggedNote.id);
+
+    if (draggedIndex === -1) return;
+
+    // 移除拖拽的便签
+    noteIds.splice(draggedIndex, 1);
+
+    // 在插入位置添加
+    const insertPos = dragInsertIndex ?? noteIds.length;
+    noteIds.splice(insertPos, 0, draggedNote.id);
+
+    await reorderNotes(noteIds);
+    toast.success('便签已重新排序');
+
+    setDraggedNote(null);
+    setDragInsertIndex(null);
   };
 
   const handleDayDragOver = (e: React.DragEvent, date: Date) => {
@@ -381,9 +433,9 @@ function LifeCalendarContent() {
       </header>
 
       <div className="max-w-[1600px] mx-auto px-4 py-4">
-        <div className="flex gap-4">
+        <div className="flex gap-4 items-start">
           {/* 左侧日历 */}
-          <div className="flex-1 bg-white rounded-2xl shadow-sm border border-amber-100 overflow-hidden">
+          <div className="flex-1 bg-white rounded-2xl shadow-sm border border-amber-100 overflow-hidden max-h-[calc(100vh-160px)]">
             {/* 月份导航 */}
             <div className="flex items-center justify-between p-4 border-b border-amber-100 bg-gradient-to-r from-amber-50 to-orange-50">
               <div className="flex items-center gap-4">
@@ -435,7 +487,7 @@ function LifeCalendarContent() {
             </div>
 
             {/* 日期网格 */}
-            <div className="grid grid-cols-7">
+            <div className="grid grid-cols-7 overflow-y-auto">
               {calendarDays.map((day, index) => {
                 const dateKey = format(day, 'yyyy-MM-dd');
                 const dayDiaries = diariesByDate.get(dateKey) || [];
@@ -564,7 +616,7 @@ function LifeCalendarContent() {
           </div>
 
           {/* 右侧便签区 */}
-          <div className="w-96 bg-white rounded-2xl shadow-sm border border-amber-100 p-4">
+          <div className="w-96 bg-white rounded-2xl shadow-sm border border-amber-100 p-4 max-h-[calc(100vh-160px)] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <StickyNote className="w-5 h-5 text-amber-600" />
@@ -581,39 +633,53 @@ function LifeCalendarContent() {
             </div>
 
             {/* 未关联便签 */}
-            <div className="space-y-2">
+            <div
+              ref={notesContainerRef}
+              className="space-y-2"
+              onDragOver={handleNotesContainerDragOver}
+              onDrop={handleNotesContainerDrop}
+            >
               {unlinkedNotes.length > 0 && (
                 <div className="text-xs text-amber-500 mb-2">未关联日期</div>
               )}
-              {unlinkedNotes.map((note) => {
+              {unlinkedNotes.map((note, index) => {
                 const colorClass = NOTE_COLORS.find(c => c.name === note.color) || NOTE_COLORS[0];
                 return (
-                  <div
-                    key={note.id}
-                    draggable
-                    onDragStart={(e) => handleNoteDragStart(e, note)}
-                    onDragEnd={handleNoteDragEnd}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openEditNote(note);
-                    }}
-                    className={`p-3 rounded-lg ${colorClass.bg} border-l-4 ${colorClass.border} cursor-pointer hover:opacity-90 transition-opacity ${note.completed ? 'opacity-60' : ''}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      {/* 圆点点击区域 - 切换完成状态 */}
-                      <span
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleNoteComplete(note, e);
-                        }}
-                        className="w-4 h-4 rounded-full bg-white/30 flex items-center justify-center text-white text-xs hover:bg-white/50 transition-colors cursor-pointer"
-                      >
-                        {note.completed && '✓'}
-                      </span>
-                      <div className={`font-medium text-amber-900 text-sm ${note.completed ? 'line-through' : ''}`}>{note.title}</div>
+                  <div key={note.id} data-note-id={note.id}>
+                    {/* 插入分隔线 */}
+                    {dragInsertIndex === index && draggedNote?.id !== note.id && (
+                      <div className="h-1 bg-amber-400 rounded-full mb-2 animate-pulse" />
+                    )}
+                    <div
+                      draggable
+                      onDragStart={(e) => handleNoteDragStart(e, note)}
+                      onDragEnd={handleNoteDragEnd}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditNote(note);
+                      }}
+                      className={`p-3 rounded-lg ${colorClass.bg} border-l-4 ${colorClass.border} cursor-pointer hover:opacity-90 transition-opacity ${note.completed ? 'opacity-60' : ''} ${draggedNote?.id === note.id ? 'opacity-50' : ''}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {/* 圆点点击区域 - 切换完成状态 */}
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleNoteComplete(note, e);
+                          }}
+                          className="w-4 h-4 rounded-full bg-white/30 flex items-center justify-center text-white text-xs hover:bg-white/50 transition-colors cursor-pointer"
+                        >
+                          {note.completed && '✓'}
+                        </span>
+                        <div className={`font-medium text-amber-900 text-sm ${note.completed ? 'line-through' : ''}`}>{note.title}</div>
+                      </div>
+                      {note.content && (
+                        <div className="text-xs text-amber-700 mt-1 line-clamp-2">{note.content}</div>
+                      )}
                     </div>
-                    {note.content && (
-                      <div className="text-xs text-amber-700 mt-1 line-clamp-2">{note.content}</div>
+                    {/* 底部插入分隔线（当拖到最后一个便签后面时） */}
+                    {dragInsertIndex === unlinkedNotes.length && index === unlinkedNotes.length - 1 && draggedNote?.id !== note.id && (
+                      <div className="h-1 bg-amber-400 rounded-full mt-2 animate-pulse" />
                     )}
                   </div>
                 );

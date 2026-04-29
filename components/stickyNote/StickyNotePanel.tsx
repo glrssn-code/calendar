@@ -38,15 +38,9 @@ export function StickyNotePanel({ onCreateEvent, filteredNotes, searchQuery }: S
 
   // 拖拽排序相关状态
   const [isReordering, setIsReordering] = useState(false);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-  const [showInsertLine, setShowInsertLine] = useState(false);
-
-  // 使用 ref 来存储插入位置，确保在 drop 时能获取最新值
-  const insertIndexRef = useRef<number | null>(null);
-  // 存储被拖拽的便签
+  const [dragInsertIndex, setDragInsertIndex] = useState<number | null>(null);
+  const notesContainerRef = useRef<HTMLDivElement>(null);
   const draggingNoteRef = useRef<StickyNote | null>(null);
-  // 存储被拖拽的原始索引
-  const draggingIndexRef = useRef<number>(-1);
 
   // 拖动检测 - 是否已经开始拖动
   const hasDragStarted = useRef(false);
@@ -127,7 +121,7 @@ export function StickyNotePanel({ onCreateEvent, filteredNotes, searchQuery }: S
   }, []);
 
   // 处理便签拖动开始
-  const handleDragStart = useCallback((e: React.DragEvent, note: StickyNote, index: number) => {
+  const handleDragStart = useCallback((e: React.DragEvent, note: StickyNote) => {
     try {
       e.dataTransfer.setData('text/plain', JSON.stringify(note));
       e.dataTransfer.effectAllowed = 'move';
@@ -136,145 +130,80 @@ export function StickyNotePanel({ onCreateEvent, filteredNotes, searchQuery }: S
     }
     setIsReordering(true);
     draggingNoteRef.current = note;
-    draggingIndexRef.current = index;
-    insertIndexRef.current = null;
   }, []);
 
-  // 处理便签在面板内拖动
-  const handleNoteDragOver = useCallback((e: React.DragEvent, index: number) => {
+  // 处理便签在面板内拖动 - 基于容器计算插入位置
+  const handleNotesContainerDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    e.stopPropagation();
-
-    if (!e.dataTransfer.getData('text/plain')) return;
-
     e.dataTransfer.dropEffect = 'move';
+    if (!draggingNoteRef.current || !notesContainerRef.current) return;
 
-    // 计算放置位置：基于鼠标在元素内的相对位置
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const midY = rect.top + rect.height / 2;
-    const isAbove = e.clientY < midY;
+    const container = notesContainerRef.current;
+    const containerRect = container.getBoundingClientRect();
+    const mouseY = e.clientY - containerRect.top;
 
-    const currentIndex = draggingIndexRef.current;
-    if (currentIndex === -1) return;
+    // 获取所有便签元素
+    const noteElements = container.querySelectorAll('[data-note-id]');
+    let insertIndex = 0;
 
-    // 计算新位置
-    let newInsertIndex: number;
-    if (isAbove) {
-      newInsertIndex = index;
-    } else {
-      newInsertIndex = index + 1;
-    }
+    noteElements.forEach((el, index) => {
+      const rect = el.getBoundingClientRect();
+      const noteMiddle = rect.top + rect.height / 2 - containerRect.top;
+      if (mouseY > noteMiddle) {
+        insertIndex = index + 1;
+      }
+    });
 
-    // 调整：如果拖拽位置在目标位置之后，插入位置要减1
-    if (currentIndex < newInsertIndex) {
-      newInsertIndex = newInsertIndex - 1;
-    }
+    setDragInsertIndex(insertIndex);
+  }, []);
 
-    // 边界检查：notes.length 是有效插入位置（表示插入到末尾之后）
-    newInsertIndex = Math.max(0, Math.min(notes.length, newInsertIndex))
-
-    // 检查是否需要更新
-    if (insertIndexRef.current !== newInsertIndex) {
-      insertIndexRef.current = newInsertIndex;
-      setDragOverIndex(index);
-      setShowInsertLine(true);
-    }
-  }, [notes.length]);
-
-  const handleNoteDrop = useCallback((e: React.DragEvent, targetIndex: number) => {
+  const handleNotesContainerDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
     const noteData = e.dataTransfer.getData('text/plain');
-    if (!noteData) {
-      // 数据不在，可能是拖拽到外部了
-      setIsReordering(false);
-      setDragOverIndex(null);
-      setShowInsertLine(false);
-      insertIndexRef.current = null;
-      draggingNoteRef.current = null;
-      draggingIndexRef.current = -1;
+    if (!noteData || !draggingNoteRef.current) {
+      handleDragEnd();
       return;
     }
 
     try {
       const draggedNote: StickyNote = JSON.parse(noteData);
-      const draggedIndex = draggingIndexRef.current;
+      const noteIds = displayNotes.map(n => n.id);
+      const draggedIndex = noteIds.indexOf(draggedNote.id);
 
-      if (draggedIndex !== -1) {
-        let insertIndex = insertIndexRef.current;
-
-        // 如果 insertIndex 为 null（没有经过 handleNoteDragOver），使用 targetIndex
-        if (insertIndex === null) {
-          insertIndex = targetIndex;
-        }
-
-        // 如果插入位置等于拖拽位置，不做任何操作
-        if (insertIndex === draggedIndex) {
-          // 什么都不做
-        } else {
-          // 执行排序
-          const newNotes = [...notes];
-          // 移除拖拽的便签
-          newNotes.splice(draggedIndex, 1);
-
-          // 重新计算插入位置（因为数组已经改变）
-          let finalInsertIndex = insertIndex;
-          if (draggedIndex < insertIndex) {
-            // 向下移动：直接使用 insertIndex（移除后会自动填补空缺）
-            finalInsertIndex = insertIndex;
-          } else if (draggedIndex > insertIndex) {
-            // 向上移动：使用 insertIndex
-            finalInsertIndex = insertIndex;
-          }
-
-          // 插入到目标位置（clamp 到有效范围）
-          const safeIndex = Math.max(0, Math.min(finalInsertIndex, newNotes.length));
-          newNotes.splice(safeIndex, 0, draggedNote);
-          reorderNotes(newNotes);
-        }
+      if (draggedIndex === -1) {
+        handleDragEnd();
+        return;
       }
+
+      // 移除拖拽的便签
+      noteIds.splice(draggedIndex, 1);
+
+      // 在插入位置添加
+      const insertPos = dragInsertIndex ?? noteIds.length;
+      noteIds.splice(insertPos, 0, draggedNote.id);
+
+      // 转换为便签对象数组
+      const noteMap = new Map(displayNotes.map(n => [n.id, n]));
+      const reorderedNotes = noteIds.map(id => noteMap.get(id)).filter((n): n is StickyNote => n !== null);
+
+      reorderNotes(reorderedNotes);
+      toast.success('便签已重新排序');
     } catch (err) {
       console.error('Failed to reorder notes:', err);
     }
 
-    // 重置状态
-    setIsReordering(false);
-    setDragOverIndex(null);
-    setShowInsertLine(false);
-    insertIndexRef.current = null;
-    draggingNoteRef.current = null;
-    draggingIndexRef.current = -1;
-  }, [notes, reorderNotes]);
+    handleDragEnd();
+  }, [displayNotes, dragInsertIndex, reorderNotes]);
 
   const handleDragEnd = useCallback(() => {
     setIsReordering(false);
-    setDragOverIndex(null);
-    setShowInsertLine(false);
-    insertIndexRef.current = null;
+    setDragInsertIndex(null);
+    draggingNoteRef.current = null;
     // 重置便签拖拽状态 - 通知日历清除预览
     window.dispatchEvent(new CustomEvent('sticky-note-drag-end'));
-    draggingNoteRef.current = null;
-    draggingIndexRef.current = -1;
   }, []);
-
-  const handlePanelDragOver = useCallback((e: React.DragEvent) => {
-    // 只在面板上时允许拖拽
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  }, []);
-
-  const handlePanelDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    // 如果 drop 在面板内部，交给 handleNoteDrop 处理
-    // 这里只处理拖出面板的情况（比如拖到日历）
-    const noteData = e.dataTransfer.getData('text/plain');
-    if (!noteData) {
-      handleDragEnd();
-    }
-  }, [handleDragEnd]);
 
   // 关闭编辑弹窗
   const handleCloseEditModal = useCallback(() => {
@@ -481,9 +410,10 @@ export function StickyNotePanel({ onCreateEvent, filteredNotes, searchQuery }: S
 
             {/* 便签列表（可拖拽排序） */}
             <div
+              ref={notesContainerRef}
               className="flex-1 overflow-y-auto p-2 space-y-1"
-              onDragOver={handlePanelDragOver}
-              onDrop={handlePanelDrop}
+              onDragOver={handleNotesContainerDragOver}
+              onDrop={handleNotesContainerDrop}
             >
               {displayNotes.length === 0 ? (
                 <div className="text-center text-slate-400 text-sm py-8">
@@ -491,27 +421,20 @@ export function StickyNotePanel({ onCreateEvent, filteredNotes, searchQuery }: S
                 </div>
               ) : (
                 displayNotes.map((note, index) => {
-                  // 显示插入线：要么在目标索引上方，要么在列表末尾
-                  const showLineAtTop = isReordering && insertIndexRef.current === index;
-                  const showLineAtBottom = isReordering && insertIndexRef.current === index + 1 && index === displayNotes.length - 1;
-                  const isBeingDragged = dragOverIndex === index;
-
                   return (
-                    <div key={note.id}>
-                      {/* 顶部插入线 */}
-                      {showLineAtTop && (
-                        <div className="h-1 bg-blue-500 rounded-full my-1 animate-pulse" />
+                    <div key={note.id} data-note-id={note.id}>
+                      {/* 插入分隔线 */}
+                      {dragInsertIndex === index && draggingNoteRef.current?.id !== note.id && (
+                        <div className="h-1 bg-blue-500 rounded-full mb-1 animate-pulse" />
                       )}
 
                       <div
                         draggable
-                        onDragStart={(e) => handleDragStart(e, note, index)}
-                        onDragOver={(e) => handleNoteDragOver(e, index)}
-                        onDrop={(e) => handleNoteDrop(e, index)}
+                        onDragStart={(e) => handleDragStart(e, note)}
                         onDragEnd={handleDragEnd}
                         className={`
                           transition-all duration-150 cursor-grab active:cursor-grabbing
-                          ${isBeingDragged ? 'opacity-40 scale-95' : ''}
+                          ${draggingNoteRef.current?.id === note.id ? 'opacity-40 scale-95' : ''}
                         `}
                       >
                         <StickyNoteItem
@@ -528,9 +451,9 @@ export function StickyNotePanel({ onCreateEvent, filteredNotes, searchQuery }: S
                         />
                       </div>
 
-                      {/* 底部插入线（仅最后一项时） */}
-                      {showLineAtBottom && (
-                        <div className="h-1 bg-blue-500 rounded-full my-1 animate-pulse" />
+                      {/* 底部插入分隔线（当拖到最后一个便签后面时） */}
+                      {dragInsertIndex === displayNotes.length && index === displayNotes.length - 1 && draggingNoteRef.current?.id !== note.id && (
+                        <div className="h-1 bg-blue-500 rounded-full mt-1 animate-pulse" />
                       )}
                     </div>
                   );

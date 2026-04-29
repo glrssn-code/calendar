@@ -114,7 +114,7 @@ export function StickyNoteItem({
         ${isDragging ? 'opacity-50 scale-95' : ''}
         group select-none cursor-grab active:cursor-grabbing
       `}
-      style={{ minHeight: '48px' }}
+      style={{ minHeight: '48px', maxHeight: '120px' }}
     >
       {/* 紧急标记 */}
       {note.isUrgent && (
@@ -157,7 +157,7 @@ export function StickyNoteItem({
             </p>
             {/* 内容（如果存在） */}
             {note.content && (
-              <p className={`text-xs text-slate-500 mt-0.5 ${note.completed ? 'line-through' : ''}`}>
+              <p className={`text-xs text-slate-500 mt-0.5 line-clamp-3 ${note.completed ? 'line-through' : ''}`}>
                 {note.content}
               </p>
             )}

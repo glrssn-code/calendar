@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { LifeDiary, LifeNote, getDiaries, getNotes, addDiary, updateDiary, deleteDiary, addNote, updateNote, deleteNote, getDiariesByDate, getNotesByDate } from '@/lib/lifeStorage';
+import { LifeDiary, LifeNote, getDiaries, getNotes, addDiary, updateDiary, deleteDiary, addNote, updateNote, deleteNote, getDiariesByDate, getNotesByDate, reorderNotes } from '@/lib/lifeStorage';
 import { useUndo } from './UndoContext';
 
 interface LifeCalendarState {
@@ -15,9 +15,10 @@ interface LifeCalendarContextType extends LifeCalendarState {
   addDiary: (diary: Omit<LifeDiary, 'id' | 'createdAt' | 'updatedAt'>) => Promise<LifeDiary>;
   updateDiary: (id: string, updates: Partial<LifeDiary>) => Promise<void>;
   deleteDiary: (id: string) => Promise<void>;
-  addNote: (note: Omit<LifeNote, 'id' | 'createdAt'>) => Promise<LifeNote>;
+  addNote: (note: Omit<LifeNote, 'id' | 'createdAt' | 'sortOrder'>) => Promise<LifeNote>;
   updateNote: (id: string, updates: Partial<LifeNote>) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
+  reorderNotes: (noteIds: string[]) => Promise<void>;
   getDiariesByDate: (date: string) => Promise<LifeDiary[]>;
   getNotesByDate: (date: string) => Promise<LifeNote[]>;
 }
@@ -90,7 +91,7 @@ export function LifeCalendarProvider({ children }: { children: React.ReactNode }
     }));
   }, [state.diaries, pushAction, refreshData]);
 
-  const handleAddNote = useCallback(async (note: Omit<LifeNote, 'id' | 'createdAt'>) => {
+  const handleAddNote = useCallback(async (note: Omit<LifeNote, 'id' | 'createdAt' | 'sortOrder'>) => {
     const newNote = await addNote(note);
     setState(prev => ({
       ...prev,
@@ -135,6 +136,24 @@ export function LifeCalendarProvider({ children }: { children: React.ReactNode }
     }));
   }, [state.notes, pushAction, refreshData]);
 
+  const handleReorderNotes = useCallback(async (noteIds: string[]) => {
+    await reorderNotes(noteIds);
+    // 更新本地状态以反映新顺序
+    const noteMap = new Map(state.notes.map(n => [n.id, n]));
+    const reorderedNotes = noteIds
+      .map((id, index) => {
+        const note = noteMap.get(id);
+        return note ? { ...note, sortOrder: index } : null;
+      })
+      .filter((n): n is LifeNote => n !== null);
+    // 保留未在 noteIds 中的便签（如关联到日期的便签）
+    const otherNotes = state.notes.filter(n => !noteIds.includes(n.id));
+    setState(prev => ({
+      ...prev,
+      notes: [...reorderedNotes, ...otherNotes],
+    }));
+  }, [state.notes]);
+
   const handleGetDiariesByDate = useCallback(async (date: string) => {
     return getDiariesByDate(date);
   }, []);
@@ -154,6 +173,7 @@ export function LifeCalendarProvider({ children }: { children: React.ReactNode }
         addNote: handleAddNote,
         updateNote: handleUpdateNote,
         deleteNote: handleDeleteNote,
+        reorderNotes: handleReorderNotes,
         getDiariesByDate: handleGetDiariesByDate,
         getNotesByDate: handleGetNotesByDate,
       }}

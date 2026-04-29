@@ -204,7 +204,7 @@ export function EventBlock({ event, onClick, height, theme = 'skeuomorphic', onD
           </div>
         )}
         {event.reminderEnabled && (
-          <div className={`absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center backdrop-blur-sm animate-pulse ${isFrostedGlass ? 'bg-white/50' : 'bg-white/30'}`}>
+          <div className={`absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center backdrop-blur-sm ${event.isUrgent ? 'animate-pulse' : ''} ${isFrostedGlass ? 'bg-white/50' : 'bg-white/30'}`}>
             <svg className={`w-2.5 h-2.5 ${isFrostedGlass ? 'text-red-500' : 'text-white'}`} fill="currentColor" viewBox="0 0 20 20">
               <path d="M10 2a6 6 0 0 0-6 6v3.586l-.707.707A1 1 0 0 0 4 14h12a1 1 0 0 0 .707-1.707L16 11.586V8a6 6 0 0 0-6-6zm0 16a3 3 0 0 1-3-3h6a3 3 0 0 1-3 3z"/>
             </svg>
