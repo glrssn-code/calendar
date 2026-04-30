@@ -51,6 +51,7 @@ export function ExportDialog({
   const [endDate, setEndDate] = useState(initialEndDate || '');
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(initialCategories || new Set(CATEGORIES));
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0); // 0=本周, -1=上周, 1=下周
+  const [includeRepeatEvents, setIncludeRepeatEvents] = useState(false); // 默认不包含重复事件
 
   // 初始化默认时间范围（本周）
   useEffect(() => {
@@ -136,9 +137,11 @@ export function ExportDialog({
       if (endDate && event.date > endDate) return false;
       // 类别过滤
       if (!selectedCategories.has(event.category)) return false;
+      // 重复事件过滤（默认关闭）
+      if (!includeRepeatEvents && event.repeatType && event.repeatType !== 'none') return false;
       return true;
     });
-  }, [events, exportMode, startDate, endDate, selectedCategories]);
+  }, [events, exportMode, startDate, endDate, selectedCategories, includeRepeatEvents]);
 
   const handleExport = () => {
     onExport(filteredEvents);
@@ -152,6 +155,7 @@ export function ExportDialog({
     setEndDate(weekRange.end);
     setSelectedCategories(new Set(CATEGORIES));
     setCurrentWeekOffset(0);
+    setIncludeRepeatEvents(false);
   };
 
   return (
@@ -289,6 +293,32 @@ export function ExportDialog({
                   ))}
                 </div>
               </div>
+
+              {/* 重复事件开关 */}
+              <div className="space-y-2">
+                <Label className="text-slate-700 font-medium flex items-center gap-1">
+                  <Filter className="w-4 h-4" />
+                  其他选项
+                </Label>
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                  <span className="text-sm text-slate-600">包含重复事件</span>
+                  <button
+                    onClick={() => setIncludeRepeatEvents(!includeRepeatEvents)}
+                    className={`w-12 h-6 rounded-full transition-all relative ${
+                      includeRepeatEvents ? 'bg-cyan-500' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${
+                        includeRepeatEvents ? 'left-7' : 'left-1'
+                      }`}
+                    />
+                  </button>
+                  <span className={`text-xs ${includeRepeatEvents ? 'text-cyan-600 font-medium' : 'text-slate-400'}`}>
+                    {includeRepeatEvents ? '是' : '否'}
+                  </span>
+                </div>
+              </div>
             </>
           )}
 
@@ -315,6 +345,16 @@ export function ExportDialog({
                   {selectedCategories.size > 0 && selectedCategories.size < CATEGORIES.length && (
                     <span className="block mt-1">
                       类别：{Array.from(selectedCategories).join('、')}
+                    </span>
+                  )}
+                  {!includeRepeatEvents && (
+                    <span className="block mt-1 text-slate-400">
+                      重复事件：已排除
+                    </span>
+                  )}
+                  {includeRepeatEvents && (
+                    <span className="block mt-1 text-cyan-600">
+                      重复事件：已包含
                     </span>
                   )}
                 </div>
