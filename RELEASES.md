@@ -12,6 +12,7 @@ releases/
     │   ├── life.html
     │   ├── settings.html
     │   ├── start.bat  # 启动脚本（启动服务器+打开浏览器）
+    │   ├── hide_server.vbs  # 后台隐藏服务器窗口脚本
     │   ├── stop.bat   # 停止服务器脚本
     │   └── 使用前请阅读.txt
     └── win/           # Windows EXE 版本
@@ -81,11 +82,12 @@ releases/
    echo   First run downloads dependencies...
    echo.
 
-   :: Start server in background
-   start /b "" cmd /c "npx --yes serve . -p %SERVER_PORT% >nul 2>&1"
+   :: Start server in background (hidden window)
+   cscript //nologo "%~dp0hide_server.vbs" %SERVER_PORT%
 
    :: Wait for server with dots
    echo   Waiting for server...
+   timeout /t 3 /nobreak >nul
    echo.
 
    set WAITED=0
@@ -135,17 +137,22 @@ releases/
    echo =========================================
 
    timeout /t 3 /nobreak >nul
-   exit
+   goto :eof
    ```
    功能：启动器有4个步骤（带序号显示进度）：
    - Step 1: 检测 Node.js，未安装则提示安装
    - Step 2: 检测端口3000，被占用则自动使用3001
-   - Step 3: 后台启动服务器，实时检测服务器就绪状态（每秒检查，最多30秒）
+   - Step 3: 后台启动服务器（使用VBScript完全隐藏窗口），等待3秒后检测服务器就绪状态（每秒检查，最多30秒）
    - Step 4: 打开浏览器，成功后3秒自动关闭窗口
    服务器在后台运行，关闭窗口不会停止服务器。
 
    **默认只发布 HTML 版本**，除非用户明确要求发布 WIN 和 HTML 版本。
-6. 在 html/ 目录下创建 stop.bat：
+6. 在 html/ 目录下创建 hide_server.vbs（用于隐藏服务器窗口）：
+   ```vbs
+   Set oShell = CreateObject("WScript.Shell")
+   oShell.Run "cmd /c npx --yes serve . -p " & WScript.Arguments(0), 0, False
+   ```
+7. 在 html/ 目录下创建 stop.bat：
    ```bat
    @echo off
    taskkill /f /im node.exe 2>nul
@@ -153,9 +160,9 @@ releases/
    pause
    ```
    功能：关闭所有 node 进程（服务器），显示确认信息。
-7. 在 html/ 目录下创建 使用前请阅读.txt（软件简介及使用教程）
-8. 压缩 win-unpacked 为 zip
-9. 提交所有更改到 git
+8. 在 html/ 目录下创建 使用前请阅读.txt（软件简介及使用教程）
+9. 压缩 win-unpacked 为 zip
+10. 提交所有更改到 git
 
 ## 注意事项
 
