@@ -47,7 +47,7 @@ export async function createBackup(): Promise<BackupData> {
     diaries,
     lifeNotes,
     createdAt: new Date().toISOString(),
-    appVersion: '1.3.4',
+    appVersion: '1.3.5',
     gameHighScore: highScoreData ?? undefined,
   };
 }

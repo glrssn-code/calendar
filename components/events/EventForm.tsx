@@ -638,7 +638,7 @@ export function EventForm({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="输入事件内容（可选）"
-                className="w-full h-9 px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/20 focus:border-blue-400 resize-none"
+                className="w-full h-20 px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/20 focus:border-blue-400 resize-none overflow-y-auto"
               />
             </div>
             <div className="space-y-1.5">

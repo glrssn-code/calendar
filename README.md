@@ -45,19 +45,19 @@ Comprehensive data visualization dashboard:
 
 ### HTML Version
 
-1. Navigate to `releases/v1.3.3/html/`
+1. Navigate to `releases/v1.3.5/html/`
 2. Double-click `start.bat`
 3. Open http://localhost:3000 in your browser
 
 Or use command line:
 ```bash
-cd releases/v1.3.3/html
+cd releases/v1.3.5/html
 npx serve . -p 3000
 ```
 
 ### Desktop App
 
-Navigate to `releases/v1.3.3/win/` and double-click `Calendar.exe`
+Navigate to `releases/v1.3.5/win/` and double-click `Calendar.exe`
 
 ### Development
 
